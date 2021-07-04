@@ -32,7 +32,7 @@ img{
 }
 
 .links{
-  width:18vw;
+  min-width:18vw;
   margin:0;
 }
 
