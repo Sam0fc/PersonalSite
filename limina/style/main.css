@@ -25,14 +25,14 @@ img{
   width:100%;
   display:flex;
   flex-direction:row;
-  justify-content: space-between;
+  justify-content: center;
   padding:0;
+  flex-wrap:wrap;
+  align-items:flex-start;
 }
 
 .links{
-  width:10vw;
-  padding-left:1vw;
-  padding-right:1vw;
+  width:18vw;
   margin:0;
 }
 
