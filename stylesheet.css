@@ -1,0 +1,58 @@
+body{
+  font-size: 1em;
+  background-image: url("galaxy.jpg");
+  background-repeat: no-repeat;
+  background-size:cover;
+  padding: 0;
+  margin:0;
+  text-align: center;
+  font-family: "Helvetica";
+  color:#F3F3F4;
+}
+
+h1{
+
+}
+
+.wrapper{
+  display: flex;
+  height: 90vh;
+  width:90%;
+  background-color: rgba(49,54,57,0.97);
+  border:0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding:5%;
+  padding-bottom: 5vh;
+  padding-top:5vh;
+}
+
+.header{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pfp{
+  border-radius: 50%;
+  max-height: 25vh;
+
+}
+
+
+.socialblock{
+  display: flex;
+  flex-direction: row;
+}
+
+.linkblock{
+  width:25%;
+  background-color: #F3F3F4;
+  text-align: center;
+  padding-top:3%;
+  padding-bottom:3%;
+  text-decoration: none;
+  color:rgb(49,54,57);
+  font-size: 2em;
+}
