@@ -47,12 +47,14 @@ h1{
 }
 
 .linkblock{
-  width:25%;
-  background-color: #F3F3F4;
+  width:100%;
+  max-width: 500px;
+  background-color: #A3A3A4;
   text-align: center;
-  padding-top:3%;
-  padding-bottom:3%;
+  padding-top:30px;
+  padding-bottom:30px;
   text-decoration: none;
   color:rgb(49,54,57);
   font-size: 2em;
+  border-radius: 40px;
 }
