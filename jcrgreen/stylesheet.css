@@ -11,6 +11,7 @@ body{
   margin:0;
   color:#F7F7F7;
   width: 100%;
+  max-width: 100%;
   overflow-x:hidden;
   position: relative;
   -webkit-box-sizing: border-box;
