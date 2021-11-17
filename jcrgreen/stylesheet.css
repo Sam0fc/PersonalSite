@@ -83,15 +83,15 @@ margin-top:-2vh;
 }
 
 .footer a{
- color:#D3A15F;
+ color:#333333;
 }
 .social{
   text-decoration:none;
-  color:#D3A15F;
+  color:#223620;
   font-family: 'Indie Flower', cursive;
 }
 .footer a:hover, .footer a:active{
-  color:#8FBCCC;
+  color:#F7F7F7;
 }
 .footerimage{
   object-fit: scale-down;
@@ -146,7 +146,7 @@ margin-top:-2vh;
   display:flex;
   flex-direction:column;
   justify-content: space-around;
-  height:100vh;
+  min-height:100vh;
   width: 100%;
   align-items: center;
   text-align: center;
@@ -158,7 +158,7 @@ margin-top:-2vh;
   display:flex;
   flex-direction:column;
   justify-content: space-around;
-  height:100vh;
+  min-height:100vh;
   width: 100%;
   align-items: center;
   text-align: center;
