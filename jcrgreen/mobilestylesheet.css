@@ -25,6 +25,7 @@
   white-space: nowrap;
   border-bottom: 1vh solid #8EBF39;
   font-size:6vh;
+  margin-left: 5vw;
 }
 /* (B) SHOW HAMBURGER ICON */
 #hamnav label {
