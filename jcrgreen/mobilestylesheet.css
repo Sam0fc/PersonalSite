@@ -42,6 +42,41 @@
 .button{
   font-size:3vh;
 }
+.picblock{
+  font-size: 3vh;
+  width: 60vw;
+  min-height: 60vh;
+}
+
+.headpic{
+  width: 60vw;
+}
+
+.policyinternal{
+  flex-direction: column;
+}
+
+.bulletlist{
+  font-size: 3vh;
+  max-width: 70vw;
+}
+
+.bulletlist2{
+  font-size: 3vh;
+  max-width: 70vw;
+}
+
+.weakexpl{
+  font-size: 2vh;
+}
+
+.name2{
+  font-size: 5vh;
+}
+
+.policyblock1 .name{
+  font-size: 5vh;
+}
 
 input{
   display:none;
@@ -152,6 +187,16 @@ input{
   max-height:none;
   width:98%;
   padding:1%;
+  flex-direction: column;
+  align-items: center;
+}
+
+.footerimage{
+  border-radius:50%;
+}
+
+.footertext{
+  width: 100%;
 }
 
 }
