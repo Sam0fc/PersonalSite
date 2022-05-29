@@ -1,6 +1,5 @@
 body{
   display:flex;
-  width:90%;
   padding:5%;
   padding-top: 0;
   margin:0;
@@ -14,7 +13,7 @@ body{
 
 .footnotes{
   border-top: 1px solid;
-  width: 100%;
+  width: 90vw;
 }
 
 .navbar{
