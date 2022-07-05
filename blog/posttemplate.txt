@@ -1,5 +1,4 @@
-<div class="post">
-<a id="2"></a>
+<div class="post" id="4">
 <h2>Title</h2>
 <p>
   Main Text
@@ -9,8 +8,7 @@
   <i>Posted 2022-05-28 (at ~2:25 Local Time) <br> After returning from a night out with the Science Fiction & Fantasy Society</i>
 </div>
 <ol class="footnotes">
-  <a id="2foot1"></a>
-  <li></li>
+  <li id="2foot1"></li>
 
 
 
