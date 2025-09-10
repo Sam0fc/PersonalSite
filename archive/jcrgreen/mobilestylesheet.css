@@ -1,0 +1,202 @@
+@media only screen and (max-width: 1000px) {
+
+.links{
+
+}
+.header{
+}
+/* (A) BREAK INTO VERTICAL MENU */
+#hamitems{
+  position:absolute;
+  height:60vh;
+  width:100vw;
+  margin-left: -5vw;
+  background-color:#223620;
+  top:10vh;
+  left:0;
+  flex-direction: column;
+  justify-content: space-around;
+  display:flex;
+}
+#hamitems a {
+  box-sizing: border-box;
+  display: block;
+  width: 10vw;
+  white-space: nowrap;
+  border-bottom: 1vh solid #8EBF39;
+  font-size:6vh;
+  margin-left: 5vw;
+}
+/* (B) SHOW HAMBURGER ICON */
+#hamnav label {
+  display: inline-block;
+  font-size: 3vh;
+}
+
+/* (C) TOGGLE SHOW/HIDE MENU */
+#hamitems a {visibility:hidden; opacity:0; transition: opacity 0.4s ease;}
+#hamnav input:checked ~ #hamitems a { visibility:visible; opacity:1; transition: opacity 0.4s ease;}
+#hamitems {visibility:hidden;}
+#hamnav input:checked ~ #hamitems { visibility:visible;}
+
+.button{
+  font-size:3vh;
+}
+.picblock{
+  font-size: 3vh;
+  width: 60vw;
+  min-height: 60vh;
+}
+
+.headpic{
+  width: 60vw;
+}
+
+.policyinternal{
+  flex-direction: column;
+}
+
+.bulletlist{
+  font-size: 3vh;
+  max-width: 70vw;
+}
+
+.bulletlist2{
+  font-size: 3vh;
+  max-width: 70vw;
+}
+
+.weakexpl{
+  font-size: 2vh;
+}
+
+.name2{
+  font-size: 5vh;
+}
+
+.policyblock1 .name{
+  font-size: 5vh;
+}
+
+input{
+  display:none;
+}
+.mobilehidden{
+  display:none;
+}
+
+.mobileshown{
+  display:block;
+}
+.banner{
+  flex-direction: column;
+  align-items: center;
+}
+
+.catchy-text{
+  width:100%;
+  font-size:3vw;
+}
+
+.banner-image-container{
+  width:100%
+}
+
+.banner-image{
+  width:100%;
+}
+
+.about-us{
+  flex-direction: column;
+  flex-wrap:nowrap;
+  height:auto;
+  min-height:80vh;
+}
+
+.aboutsection{
+  width:100%;
+  font-size:3vh;
+  margin-top:2vh;
+  height:100%;
+  padding:0;
+
+}
+
+.aboutimage{
+  width:100%;
+  max-width:none;
+  min-height:auto;
+  height:100%;
+  padding:0;
+}
+
+.teamcontainer{
+  flex-direction:row;
+}
+.headshot{
+  width:18vh;
+  height:18vh;
+  min-width:25vw;
+  min-height:25vw;
+}
+.teammember{
+  height:30vh;
+  width:30vw;
+}
+.teammember p{
+  font-size:1.7vw;
+}
+.desctext{
+  width:27vw;
+}
+.description h2{
+  margin-top:-1vh;
+  font-size:2vh;
+}
+.description h1{
+  font-size:2.5vh;
+}
+.sidebuttons{
+  flex-direction:column;
+
+}
+.sidehalf{
+  width:100%;
+}
+.circlebutton{
+  height:30vh;
+  width:30vh;
+  line-height:32vh;
+  font-size:20vh;
+  min-height:auto;
+  max-width:none;
+}
+.getintouchblock{
+  height:auto;
+  min-height:120vh;
+  font-size:30px;
+}
+.email{
+  font-size:1.7vh;
+}
+.footer ul{
+  margin-top:0;
+}
+.footer{
+  font-size:1.6vh;
+  max-height:none;
+  width:98%;
+  padding:1%;
+  flex-direction: column;
+  align-items: center;
+}
+
+.footerimage{
+  border-radius:50%;
+}
+
+.footertext{
+  width: 100%;
+}
+
+}

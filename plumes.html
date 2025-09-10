@@ -1,0 +1,61 @@
+<head>
+	<link rel="stylesheet" href="style.css"> 
+	<meta charset="UTF-8">
+	<title>coreclean - Sam Hutton</title>
+</head> 
+
+<body>
+<div class="page-head"> 
+		<a href='portfolio.html'> <img src="./assets/cover.png" alt="Lorenz Attractor"> </a>
+<h1> Methane Plume Project </h1> 
+</div>
+	<div class="content">
+	<div class="post-wrapper">
+			<p> <a href='https://github.com/Sam0fc/methane_flux'> Simulating methane plumes</a> was done based on meteorological data and the EPA ISC3 model to estimate the contributions of Milton landfill to a sensor. </p>
+
+			This is important because it allows us to get an idea of the emission patterns from a landfill site with only one sensor recording and knowledge of the atmosphere. Models like this are useful for accountability and environmental regulation. 
+			<h2> Abstract </h2>
+			<p> This report attempts to constrain the emissive methane (CH4 ) flux from Milton Landfill using
+a steady-state gaussian plume model to reconstruct emissions from methance concentration data
+recorded at Microsoft Research Cambridge (MRC) in June 2024. Our model neglects the advection
+time of CH4 in favour of a steady-state statistical model which depends only on the wind vector and
+atmospheric stability which we can reconstruct from the MRC data. Using the EPA’s ISC3 model’s
+parameters, we find that the flux depends on whether we take the model to be a point, line or
+area source. It is likely that the point source is the most physical model as the concentration seems
+best reproduced from the onsite gas flaring plant’s emissions, though the areal source provides a
+qualitiatively good fit at low concentrations. Other than three "spike" events, likely associated with
+				landfill collapse or methane release events, the background flux is between 7.75 g s−1 and 2.65 g s−1 </p>
+
+		<h2> Selected Figures </h2>
+  <div class="grid-container">
+        <div class="image-item" onclick="openModal(0)">
+            <img src="./assets/plumes.html/1.png" alt="Image 1">
+        </div>
+        <div class="image-item" onclick="openModal(1)">
+						<img src="./assets/plumes.html/2.png" alt="Image 2">
+        </div>
+        <div class="image-item" onclick="openModal(2)">
+						<img src="./assets/plumes.html/3.png" alt="Image 3">
+        </div>
+				<div class="image-item" onclick="openModal(3)">
+						<img src="./assets/plumes.html/4.png" alt="Image 4">
+				</div>
+			</div>
+    <div id="modal" class="modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img id="expanded-img" class="expanded-img">
+        <div class="arrows">
+            <span class="arrow left" onclick="moveImage(-1)">&#10094;</span>
+            <span class="arrow right" onclick="moveImage(1)">&#10095;</span>
+        </div>
+    </div>
+		<a href='./assets/plumes.pdf'> Full Report </a>
+	</div>
+	</div>
+	<div class="footer">
+		<h1> <a href='./index.html'> Sam Hutton </a> </h1><p><i> Climate & Data Science </i> </p>
+		</div>
+	<script src="script.js"></script>
+<script> window.onload = function() { document.documentElement.style.opacity = '1'; }
+</script>
+</body>

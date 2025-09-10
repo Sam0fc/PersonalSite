@@ -1,0 +1,61 @@
+<head>
+	<link rel="stylesheet" href="style.css"> 
+	<meta charset="UTF-8">
+	<title>coreclean - Sam Hutton</title>
+</head> 
+
+<body>
+<div class="page-head"> 
+		<a href='portfolio.html'> <img src="./assets/cover.png" alt="Lorenz Attractor"> </a>
+<h1> Great Ouse Fieldwork </h1> 
+</div>
+	<div class="content">
+	<div class="post-wrapper">
+			<p> This report aimed to measure concentrations of ions and dissolved gases in the river water of the Great Ouse in Norfolk. </p>
+			<p> Wetlands like the fens near the Great Ouse estuary are a major source of CH4 emissions, and react to environmental changes (flooding, tides etc.). This means that constraining the relationships with chemistry and tides is of utility.</p>
+
+		<h2> Abstract </h2>
+			<p> This project aimed to constrain methane concentrations in the Great Ouse.
+Due to issues with gas analysis methodology, this was not possible. Instead, the associated nutrients, industrial inputs, tidal variation, and spatial gradients were investigated, in
+order to provide better basis for future work into dissolved CH4 concentrations. We
+found that Salinity is dominated by the temporal tidal cycle, though there is some
+dependance on location, especially due to the St Germans pumping station. The
+impermeable Kimmeridge Clay bedrock prevents any groundwater effects, including
+allowing Alkalinity to behave conservatively. Nutrient concentrations vary accord-
+ing to flow rate and location of tributaries. Industrial input provides negligible
+changes in this area. More work is needed to spatially constrain CH4 concentrations.
+			</p>
+
+		<h2> Selected Figures </h2>
+  <div class="grid-container">
+        <div class="image-item" onclick="openModal(0)">
+            <img src="./assets/flux.html/1.png" alt="Image 1">
+        </div>
+        <div class="image-item" onclick="openModal(1)">
+						<img src="./assets/flux.html/2.png" alt="Image 2">
+        </div>
+        <div class="image-item" onclick="openModal(2)">
+						<img src="./assets/flux.html/3.png" alt="Image 3">
+        </div>
+				<div class="image-item" onclick="openModal(3)">
+						<img src="./assets/flux.html/4.png" alt="Image 4">
+				</div>
+			</div>
+    <div id="modal" class="modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img id="expanded-img" class="expanded-img">
+        <div class="arrows">
+            <span class="arrow left" onclick="moveImage(-1)">&#10094;</span>
+            <span class="arrow right" onclick="moveImage(1)">&#10095;</span>
+        </div>
+    </div>
+		<a href='./assets/flux.pdf'> Full Report </a>
+	</div>
+	</div>
+	<div class="footer">
+		<h1> <a href='./index.html'> Sam Hutton </a> </h1><p><i> Climate & Data Science </i> </p>
+		</div>
+	<script src="script.js"></script>
+<script> window.onload = function() { document.documentElement.style.opacity = '1'; }
+</script>
+</body>

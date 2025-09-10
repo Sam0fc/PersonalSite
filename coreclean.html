@@ -1,0 +1,66 @@
+<head>
+	<link rel="stylesheet" href="style.css"> 
+	<meta charset="UTF-8">
+	<title>coreclean - Sam Hutton</title>
+</head> 
+
+<body>
+<div class="page-head"> 
+		<a href='portfolio.html'> <img src="./assets/cover.png" alt="Lorenz Attractor"> </a>
+<h1> coreclean </h1> 
+</div>
+	<div class="content">
+	<div class="post-wrapper">
+			<p> <a href='https://github.com/Sam0fc/coreclean'> coreclean</a>  is a python utility which uses convolutional neural networks and standard image processing techniques to remove backgrounds, cracks, and burrows from images of sediment cores. </p>
+			<p> This is important because sediment colour contains information about the Earth's climate. At the Iberian Margin (where the cores I used were taken), the record stretches back over 1.4 million years.
+		<h2> Abstract </h2>
+			<p>Sediment cores contain a long-timescale record of important climatalogical parameters. Even
+common, expensive, time-consuming sampling methods cannot match the resolution of colour data
+taken from digital photographs; but this data is noisy, in part due to bioturbation, drilling disturbance,
+and sampling artifacts. This report presents a number of improvements to existing neural network
+based methods of segmenting ‘undisturbed’ sediment from core images and applies the newly created
+model to producing a filtered record of lightness over 160m ∼ 1400ka. These improvements include
+a novel morphological-process background removal, selection of an improved model architecture
+(SegNet), and three methods for synthetic data augmentation. Data augmentation did not have a
+significant effect on model performance. With all of these improvements, our new method produces an
+Intersection-Over-Union of 0.53 ± 0.09. This model likely underpredicts disturbance, despite selecting
+26.6 % of the average core. This suggests a need for more training on a larger dataset to improve
+the model, and a need for the development of stronger statistical tools to address the gaps created by
+disturbance modifying the record. Cross-correlation analysis suggests that the resolution available in
+undisturbed sediment may be lower than previous estimates. Tools for using this model and other
+common stitching and averaging operations on digital photographs are presented in the coreclean
+				module for python, developed alongside this report. </p>
+
+		<h2> Selected Figures </h2>
+  <div class="grid-container">
+        <div class="image-item" onclick="openModal(0)">
+            <img src="./assets/coreclean.html/1.png" alt="Image 1">
+        </div>
+        <div class="image-item" onclick="openModal(1)">
+						<img src="./assets/coreclean.html/2.png" alt="Image 2">
+        </div>
+        <div class="image-item" onclick="openModal(2)">
+						<img src="./assets/coreclean.html/3.png" alt="Image 3">
+        </div>
+				<div class="image-item" onclick="openModal(3)">
+						<img src="./assets/coreclean.html/4.png" alt="Image 4">
+				</div>
+			</div>
+    <div id="modal" class="modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img id="expanded-img" class="expanded-img">
+        <div class="arrows">
+            <span class="arrow left" onclick="moveImage(-1)">&#10094;</span>
+            <span class="arrow right" onclick="moveImage(1)">&#10095;</span>
+        </div>
+    </div>
+		<a href='./assets/coreclean.pdf'> Full Report </a>
+	</div>
+	</div>
+	<div class="footer">
+		<h1> <a href='./index.html'> Sam Hutton </a> </h1><p><i> Climate & Data Science </i> </p>
+		</div>
+	<script src="script.js"></script>
+<script> window.onload = function() { document.documentElement.style.opacity = '1'; }
+</script>
+</body>

@@ -1,0 +1,59 @@
+<head>
+	<link rel="stylesheet" href="style.css"> 
+	<meta charset="UTF-8">
+	<title>coreclean - Sam Hutton</title>
+</head> 
+
+<body>
+<div class="page-head"> 
+		<a href='portfolio.html'> <img src="./assets/cover.png" alt="Lorenz Attractor"> </a>
+<h1> Embedding Chaos </h1> 
+</div>
+	<div class="content">
+	<div class="post-wrapper">
+			<p> <a href='https://github.com/Sam0fc/ChaosEmbeddings'> Lorenz attractor simulation </a> was used to test ways of reconstructing chaotic systems. Nearest neighbour forecasting was implemented; as were several information theoretical metrics, such as the metric entropy, Cao's method coefficients and self mutual information for choosing optimal embedding dimension.</p>
+			
+			The Lorenz attractor is a simplified convective system and is important as a chaotic deterministic system. The embedding process reveals that it's possible to extract information from limited datasets over short time periods. Nearest neighbour forecasting suggests that even chaotic systems believe predictably with enough training data. 
+			<h2> Aims </h2>
+Explore the dynamics of the Lorenz system by numerical simulation.
+			<ul>
+				<li>Calculate the Metric Entropy of the Lorenz system using the forecasting error of the k-nearest</li>
+neighbour method.
+				<li>Compute the Lyapunov spectrum of the system.</li>
+				<li>Find the best embedding parameters for the Lorenz system using Cao’s method and the self-
+					mutual information. </li>
+				<li>Perform the same calculations with added noise.</li>
+			</ul>
+		<h2> Selected Figures </h2>
+  <div class="grid-container">
+        <div class="image-item" onclick="openModal(0)">
+            <img src="./assets/chaos.html/1.png" alt="Image 1">
+        </div>
+        <div class="image-item" onclick="openModal(1)">
+						<img src="./assets/chaos.html/2.png" alt="Image 2">
+        </div>
+        <div class="image-item" onclick="openModal(2)">
+						<img src="./assets/chaos.html/3.png" alt="Image 3">
+        </div>
+				<div class="image-item" onclick="openModal(3)">
+						<img src="./assets/chaos.html/4.png" alt="Image 4">
+				</div>
+			</div>
+    <div id="modal" class="modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img id="expanded-img" class="expanded-img">
+        <div class="arrows">
+            <span class="arrow left" onclick="moveImage(-1)">&#10094;</span>
+            <span class="arrow right" onclick="moveImage(1)">&#10095;</span>
+        </div>
+    </div>
+		<a href='./assets/chaos.pdf'> Full Report </a>
+	</div>
+	</div>
+	<div class="footer">
+		<h1> <a href='./index.html'> Sam Hutton </a> </h1><p><i> Climate & Data Science </i> </p>
+		</div>
+	<script src="script.js"></script>
+<script> window.onload = function() { document.documentElement.style.opacity = '1'; }
+</script>
+</body>
