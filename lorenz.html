@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lorenz Attractor with Fading Trail</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #1e1e2e; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // Lorenz system parameters
+        const sigma = 10;
+        const rho = 28;
+        const beta = 8 / 3;
+        
+        let dt = 0.01;  // Time step
+        let x = 1, y = 0, z = 0;  // Initial conditions
+        let trailLength = 100;  // Number of points in the trail
+        let trailPoints = [];  // Array to store trail points
+				let colors = [];  // Array to store colors for fading effect
+        let trailGeometry = new THREE.BufferGeometry();  // Trail geometry
+				let mouseX = 0, mouseY = 0;  // Mouse position 
+				let rotationSpeed = 0.3;  // Speed of rotation based on mouse movement
+
+        // Scene setup
+        let scene = new THREE.Scene();  
+				// how to set background color 
+				scene.background = new THREE.Color(0x1e1e2e);
+        let camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        let renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Material for the point and trail (with fading effect)
+        let trailMaterial = new THREE.PointsMaterial({
+            color: 0xcdd6f4,
+            opacity: 1,
+						transparent: true,
+        });
+
+        // Create the point to represent the moving object
+        let pointGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+        let pointMaterial = new THREE.MeshBasicMaterial({ color: 0x89b4fa });
+        let point = new THREE.Mesh(pointGeometry, pointMaterial);
+        scene.add(point);
+
+        // Set up camera position and look at the center
+        camera.position.set(40, -40, 40);
+        camera.lookAt(0, 0, 0);
+
+        // Create the Points object for the trail
+        let trail = new THREE.Line(trailGeometry, trailMaterial);
+        scene.add(trail);
+				// Mouse move event listener to track the mouse position
+        document.addEventListener('mousemove', (event) => {
+            mouseX = (event.clientX / window.innerWidth) * 2 - 1;  // Normalize mouseX to [-1, 1]
+            mouseY = -(event.clientY / window.innerHeight) * 2 + 1;  // Normalize mouseY to [-1, 1]
+        });
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Lorenz system equations
+            let dx = sigma * (y - x);
+            let dy = x * (rho - z) - y;
+            let dz = x * y - beta * z;
+
+            // Update the position of the point
+            x += dx * dt;
+            y += dy * dt;
+            z += dz * dt;
+
+            // Update the point position (with correction to our origin
+						rendererX = x;
+						rendererY = y;
+						rendererZ = z - 30;
+            point.position.set(rendererX, rendererY, rendererZ);
+
+            // Add the new point to the trail
+            trailPoints.push(new THREE.Vector3(rendererX, rendererY, rendererZ));
+
+            // Limit trail length
+            if (trailPoints.length > trailLength) {
+                trailPoints.shift(); // Remove the oldest point
+            }
+
+            // Create a new positions array for the trail geometry
+            let positions = [];
+            let opacity = 1;  // Start with full opacity
+
+						for (let i = 0; i < trailPoints.length; i++) {
+                positions.push(trailPoints[i].x, trailPoints[i].y, trailPoints[i].z);
+                
+                // Calculate opacity based on the age of the point in the trail
+                let opacity = 1 - (i / trailPoints.length); // Fade out older points
+                colors.push(0.54, 0.71, 0.98, opacity);  // Light blue with fading opacity
+            }
+
+            // Update the geometry with the new positions and colors
+            trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            trailGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));  // RGBA
+
+            // Enable vertex colors to handle fading per point
+            trailMaterial.vertexColors = THREE.VertexColors;
+
+
+            // Update the geometry with the new positions
+            trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+            // Update the opacity of the trail material
+            trailMaterial.opacity = opacity;
+						
+					if (trailLength < 900) { 
+						trailLength *= 1.001;
+					}
+					else {
+						trailLength += 0.9;
+					}
+
+  					scene.rotation.x =  mouseX * rotationSpeed;  // Rotate around X axis (up/down)
+            scene.rotation.y =  mouseY * rotationSpeed;  // Rotate around Y axis (left/right)
+						
+						
+
+            // Render the scene from the camera's perspective
+            renderer.render(scene, camera);
+        }
+				
+        // Start the animation loop
+        animate();
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+    </script>
+
+</body>
+</html>
+
