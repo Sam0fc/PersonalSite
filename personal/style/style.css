@@ -55,11 +55,11 @@ body{
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     height: 90vh;
     font-family: 'Palatino', serif;
     background-color: rgba(30, 30, 50, 0.9);
     border: 1vw solid #000000;
+    overflow:scroll;
 }
 
 .framed-box{
@@ -138,4 +138,47 @@ body{
 
 .btn-holder:hover .btn-inner {
   width: 4.5rem;
+}
+
+.logo {
+    position:sticky;
+    align-self:center;
+    font-size:0.7em;
+}
+
+.list{
+    display:flex;
+    flex-direction: column;
+    width:700px;
+    padding-left: 20px;
+    padding-right: 20px;
+    border: 1px solid #cdd6f4;
+}
+
+a{
+    color: #cdd6f4;
+}
+
+a:hover{
+    color: #ffadad;
+}
+
+h1{
+    margin:0;
+}
+
+.rating{
+    align-self: center;
+    margin:2vh;
+}
+
+h3{
+    margin:0;
+}
+
+h2{
+    margin:0;
+}
+
+p{
 }
