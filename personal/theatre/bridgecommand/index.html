@@ -103,6 +103,7 @@
 
   @media (max-width: 700px) {
     #mobileFlipNav { display: flex; }
+    #stackWrapper { overflow-x: hidden; max-width: 100vw; }
     .stack { perspective: 1400px; }
     .stack .bg-paper, .stack > .page {
       position: absolute;
@@ -1156,20 +1157,26 @@ document.querySelectorAll('.bg-paper').forEach(function (el) {
 })();
 
 // zoom the whole stack out so its top and bottom always fit in the viewport
+const STACK_DESIGN_WIDTH = 1100; // must match the fixed width in the .stack CSS rule
+
 function fitStackToViewport() {
   const wrapper = document.getElementById('stackWrapper');
   const stack = document.querySelector('.stack');
   stack.style.transform = 'none';
   const naturalHeight = stack.getBoundingClientRect().height;
-  const naturalWidth = stack.getBoundingClientRect().width;
   const availableHeight = window.innerHeight - 80;
   const availableWidth = window.innerWidth - 40;
   // scale to fit both dimensions — the whole "poster" shrinks as one unit,
-  // it never reflows/crushes its (fixed-width) internal layout
-  const scale = Math.min(1, availableHeight / naturalHeight, availableWidth / naturalWidth) * 0.94;
+  // it never reflows/crushes its (fixed-width) internal layout.
+  // Width uses the known design width directly (not a DOM measurement) so
+  // it can never be thrown off by measurement timing.
+  const widthScale = availableWidth / STACK_DESIGN_WIDTH;
+  const heightScale = availableHeight / naturalHeight;
+  const scale = Math.min(1, widthScale, heightScale) * 0.94;
   stack.style.transform = 'scale(' + scale + ')';
   wrapper.style.height = (naturalHeight * scale) + 'px';
-  wrapper.style.width = (naturalWidth * scale) + 'px';
+  wrapper.style.maxWidth = 'none';
+  wrapper.style.width = (STACK_DESIGN_WIDTH * scale) + 'px';
 }
 window.addEventListener('resize', fitStackToViewport);
 window.addEventListener('load', fitStackToViewport);
