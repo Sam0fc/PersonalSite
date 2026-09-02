@@ -577,14 +577,16 @@ function renderTrainingRecs(rows) {
   list.appendChild(li2);
 
   const frontlineCount = rows.filter(r => (r.Category || '').toLowerCase().includes('frontline')).length;
-  const li3 = document.createElement('li');
-  li3.appendChild(document.createTextNode('Officer has made good progress on the front in '));
-  const frontMark = document.createElement('mark');
-  frontMark.textContent = frontlineCount;
-  frontMark.title = 'Count of missions with category Frontline.';
-  li3.appendChild(frontMark);
-  li3.appendChild(document.createTextNode(' frontline deployments.'));
-  list.appendChild(li3);
+  if (frontlineCount > 0) {
+    const li3 = document.createElement('li');
+    li3.appendChild(document.createTextNode('Officer has made good progress on the front in '));
+    const frontMark = document.createElement('mark');
+    frontMark.textContent = frontlineCount;
+    frontMark.title = 'Count of missions with category Frontline.';
+    li3.appendChild(frontMark);
+    li3.appendChild(document.createTextNode(' frontline deployments.'));
+    list.appendChild(li3);
+  }
 
   const li4 = document.createElement('li');
   li4.appendChild(document.createTextNode('Officer has now completed '));
