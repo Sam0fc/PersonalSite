@@ -33,7 +33,7 @@
      The scale() here is a pure-CSS guarantee that it fits the viewport width
      even before/without JS; fitStackToViewport() then refines it further to
      also account for height. */
-  .stack { position: relative; width: 1100px; transform-origin: top center; transform: scale(min(1, calc((100vw - 40px) / 1100px))); }
+  .stack { position: relative; width: 1100px; transform-origin: top left; transform: scale(min(1, calc((100vw - 40px) / 1100px))); }
   .page {
     position: relative;
     z-index: 10;
