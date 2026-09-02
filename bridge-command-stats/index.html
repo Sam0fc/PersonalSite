@@ -516,7 +516,7 @@ function renderTrainingRecs(rows) {
 
   // lowest-percentage mission type, counted fleet-wide by unique mission name (no duplicates)
   let worstCat = null, worstCatPct = Infinity;
-  Object.keys(TRAINING_TARGETS).forEach(catKey => {
+  Object.keys(TRAINING_TARGETS).filter(catKey => catKey !== 'campaign').forEach(catKey => {
     const target = TRAINING_TARGETS[catKey];
     const uniqueMissions = new Set(
       rows
