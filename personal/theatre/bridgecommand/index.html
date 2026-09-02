@@ -104,20 +104,26 @@
   @media (max-width: 700px) {
     #mobileFlipNav { display: flex; }
     #stackWrapper { overflow-x: hidden; max-width: 100vw; }
-    .stack { perspective: 1400px; }
     .stack .bg-paper, .stack > .page {
       position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      opacity: 0;
-      pointer-events: none;
+      top: 0; left: 0; width: 100%; height: auto;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
     .stack .bg-paper.mobile-active, .stack > .page.mobile-active {
       position: relative;
-      width: 100%;
-      height: auto;
-      opacity: 1;
-      pointer-events: auto;
+      z-index: 30;
+      transform: none;
+      cursor: default;
+    }
+    .stack .bg-paper.mobile-peek-1, .stack > .page.mobile-peek-1 {
       z-index: 20;
+      transform: translateY(26px) rotate(-2deg);
+      cursor: pointer;
+    }
+    .stack .bg-paper.mobile-peek-2, .stack > .page.mobile-peek-2 {
+      z-index: 10;
+      transform: translateY(46px) rotate(2deg);
+      cursor: pointer;
     }
   }
 </style>
@@ -1070,7 +1076,8 @@ document.querySelectorAll('.bg-paper').forEach(function (el) {
   });
 });
 
-// mobile: turn the paper stack into a flip-through view, one page at a time
+// mobile: show the papers as a real stack, with the ones behind peeking out
+// at the bottom — tap a peeking corner to bring that paper to the front
 (function () {
   const bgPapers = document.querySelectorAll('.bg-paper');
   const mobilePages = [
@@ -1078,82 +1085,40 @@ document.querySelectorAll('.bg-paper').forEach(function (el) {
     { el: bgPapers[1], label: 'Fleet Log' },
     { el: bgPapers[0], label: 'Mess Intelligence' }
   ];
-  let mobileIndex = 0;
 
-  function showMobilePage(newIndex) {
-    if (newIndex === mobileIndex) return;
-    const oldEl = mobilePages[mobileIndex].el;
-    const newEl = mobilePages[newIndex].el;
+  // order[0] is on top (the readable page), order[1]/order[2] peek out behind it
+  let order = [0, 1, 2];
+  const peekClasses = ['mobile-active', 'mobile-peek-1', 'mobile-peek-2'];
 
-    oldEl.style.transition = 'transform 0.35s ease, opacity 0.35s ease';
-    oldEl.style.transform = 'rotateY(-90deg)';
-    oldEl.style.opacity = '0';
-
-    setTimeout(function () {
-      oldEl.classList.remove('mobile-active');
-      newEl.classList.add('mobile-active');
-      newEl.style.transition = 'none';
-      newEl.style.transform = 'rotateY(90deg)';
-      newEl.style.opacity = '0';
-      requestAnimationFrame(function () {
-        newEl.style.transition = 'transform 0.35s ease, opacity 0.35s ease';
-        newEl.style.transform = 'rotateY(0deg)';
-        newEl.style.opacity = '1';
-        setTimeout(fitStackToViewport, 380);
-      });
-    }, 350);
-
-    mobileIndex = newIndex;
+  function applyStackOrder() {
+    mobilePages.forEach(function (p) {
+      p.el.classList.remove('mobile-active', 'mobile-peek-1', 'mobile-peek-2');
+    });
+    order.forEach(function (pageIdx, stackPos) {
+      mobilePages[pageIdx].el.classList.add(peekClasses[stackPos]);
+    });
     document.getElementById('mobilePageLabel').textContent =
-      mobilePages[mobileIndex].label + ' (' + (mobileIndex + 1) + '/' + mobilePages.length + ')';
+      mobilePages[order[0]].label + ' (1/' + mobilePages.length + ')';
+    setTimeout(fitStackToViewport, 320);
   }
 
-  mobilePages[0].el.classList.add('mobile-active');
-  document.getElementById('mobilePageLabel').textContent = mobilePages[0].label + ' (1/' + mobilePages.length + ')';
-
-  function isMobile() {
-    return window.matchMedia('(max-width: 700px)').matches;
+  function bringToFront(pageIdx) {
+    if (order[0] === pageIdx) return;
+    order = [pageIdx].concat(order.filter(function (i) { return i !== pageIdx; }));
+    applyStackOrder();
   }
-  function next() { showMobilePage((mobileIndex + 1) % mobilePages.length); }
-  function prev() { showMobilePage((mobileIndex - 1 + mobilePages.length) % mobilePages.length); }
 
-  // scroll (wheel) to switch page on mobile, instead of buttons
-  let wheelLocked = false;
-  window.addEventListener('wheel', function (e) {
-    if (!isMobile() || wheelLocked || Math.abs(e.deltaY) < 25) return;
-    wheelLocked = true;
-    if (e.deltaY > 0) next(); else prev();
-    setTimeout(function () { wheelLocked = false; }, 600);
-  }, { passive: true });
-
-  // swipe up/down to switch page on touch devices
-  let touchStartY = null;
-  let touchStartX = null;
-  window.addEventListener('touchstart', function (e) {
-    if (isMobile()) {
-      touchStartY = e.touches[0].clientY;
-      touchStartX = e.touches[0].clientX;
-    }
-  }, { passive: true });
-  window.addEventListener('touchend', function (e) {
-    if (!isMobile() || touchStartY === null) return;
-    const dy = touchStartY - e.changedTouches[0].clientY;
-    const dx = touchStartX - e.changedTouches[0].clientX;
-    touchStartY = null;
-    touchStartX = null;
-
-    // a real swipe (finger moved) still switches pages
-    if (Math.abs(dy) >= 50 || Math.abs(dx) >= 50) {
-      if (Math.abs(dy) > Math.abs(dx)) { if (dy > 0) next(); else prev(); }
-      else { if (dx > 0) next(); else prev(); }
-      return;
-    }
-
-    // otherwise treat it as a tap: tapping the paper background flips forward,
-    // but not if the tap landed on an interactive element (form, button, link, etc.)
-    const interactive = e.target.closest('input, select, button, textarea, a, label, .marker, .status-btn');
-    if (!interactive) next();
+  mobilePages.forEach(function (p, idx) {
+    p.el.addEventListener('click', function (e) {
+      // only the peeking (non-front) papers respond to a tap; a tap on the
+      // front page's own content should behave normally (buttons, chart, etc.)
+      if (order[0] === idx) return;
+      e.preventDefault();
+      bringToFront(idx);
+    });
   });
+
+  applyStackOrder();
 })();
 
 // zoom the whole stack out so its top and bottom always fit in the viewport
