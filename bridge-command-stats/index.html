@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mission Cumulative Frequency</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Dancing+Script:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  body {
+    margin: 0;
+    font-family: 'Exo 2', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #05070d;
+    background-image:
+      radial-gradient(1px 1px at 20px 30px, white, transparent),
+      radial-gradient(1px 1px at 60px 110px, white, transparent),
+      radial-gradient(1px 1px at 100px 20px, white, transparent),
+      radial-gradient(1.5px 1.5px at 140px 90px, white, transparent),
+      radial-gradient(1px 1px at 170px 50px, white, transparent),
+      radial-gradient(1px 1px at 190px 140px, white, transparent);
+    background-repeat: repeat;
+    background-size: 220px 220px;
+    overflow-x: hidden;
+  }
+  #stackWrapper { width: 100%; max-width: 1100px; margin: 40px auto; overflow: visible; }
+  /* fixed "poster" width — always laid out at full desktop size, then scaled
+     as a whole (never reflowed) to fit the viewport, so text never crushes.
+     The scale() here is a pure-CSS guarantee that it fits the viewport width
+     even before/without JS; fitStackToViewport() then refines it further to
+     also account for height. */
+  .stack { position: relative; width: 1100px; transform-origin: top left; transform: scale(min(1, calc((100vw - 40px) / 1100px))); }
+  .page {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.65), 0 4px 14px rgba(0,0,0,0.4);
+    cursor: grab;
+    transform-origin: center top;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
+    animation: pageDragIn 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    aspect-ratio: 210 / 297; /* A4 */
+  }
+  .page.dragging {
+    cursor: grabbing;
+    transition: none;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.75), 0 10px 20px rgba(0,0,0,0.5);
+  }
+  @keyframes pageDragIn {
+    from { transform: translateY(160px) rotate(-4deg); opacity: 0; box-shadow: 0 5px 10px rgba(0,0,0,0.2); }
+    to { transform: translateY(0) rotate(0deg); opacity: 1; }
+  }
+  .bg-paper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 210 / 297; /* A4, matches .page */
+    z-index: 1;
+    background: white;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+    cursor: grab;
+    transform-origin: center top;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
+  }
+  .bg-paper.dragging { cursor: grabbing; transition: none; box-shadow: 0 30px 60px rgba(0,0,0,0.6); }
+  .bg-paper .mini-header, .bg-paper .mini-footer {
+    background: #283372;
+    color: white;
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .bg-paper .mini-header { padding: 24px 20px; font-size: 1.4em; }
+  .bg-paper .mini-footer { padding: 20px 20px; font-size: 0.9em; text-align: center; position: absolute; bottom: 0; left: 0; right: 0; }
+  .redact { display: inline-block; height: 0.9em; background: black; border-radius: 2px; vertical-align: middle; }
+  .doc-code { font-family: monospace; font-size: 1.1em; opacity: 0.6; letter-spacing: 0.5px; }
+  main { flex: 1; }
+  .status-btn { display: block; width: 85%; box-sizing: border-box; padding: 16px 10px; margin: 0 auto 12px auto; border-radius: 8px; text-align: center; font-family: 'Exo 2', sans-serif; font-weight: 700; text-transform: uppercase; font-size: 15px; letter-spacing: 0.5px; background: #ddd; color: #999; }
+  .status-btn.active-auth { background: #283372; color: white; }
+  .status-btn.active-threat { background: #c62828; color: white; }
+  #userName::placeholder { color: rgba(255,255,255,0.7); }
+  #trainingRecs mark { background: #ffe58a; padding: 0 2px; }
+  #trainingRecs ul { font-size: 1.3em; line-height: 1.8; padding-left: 1.4em; }
+  #trainingRecs li { margin-bottom: 14px; }
+  .signatures { display: flex; gap: 60px; margin-top: 20px; }
+  .signature-block { flex: 1; }
+  .signature-line { border-bottom: 1px solid black; min-height: 44px; display: flex; align-items: flex-end; padding-bottom: 2px; }
+  .signature-text { font-family: 'Dancing Script', cursive; font-size: 1.8em; }
+  .signature-input { font-family: 'Dancing Script', cursive; font-size: 1.8em; border: none; outline: none; width: 100%; background: transparent; }
+  .signature-caption { font-size: 12px; margin-top: 4px; color: #333; }
+
+  @media (max-width: 700px) {
+    #stackWrapper { overflow-x: hidden; max-width: 100vw; }
+    .stack .bg-paper, .stack > .page {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: auto;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .stack .bg-paper.mobile-active, .stack > .page.mobile-active {
+      position: relative;
+      z-index: 30;
+      transform: none;
+      cursor: default;
+    }
+    .stack .bg-paper.mobile-peek-1, .stack > .page.mobile-peek-1 {
+      z-index: 20;
+      transform: translate(-70px, 260px) rotate(-4deg);
+      cursor: pointer;
+    }
+    .stack .bg-paper.mobile-peek-2, .stack > .page.mobile-peek-2 {
+      z-index: 10;
+      transform: translate(70px, 460px) rotate(4deg);
+      cursor: pointer;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="tooltip" style="position:absolute; display:none; background:white; border:1px solid black; padding:8px 12px; font-size:13px; pointer-events:none; z-index:1000;"></div>
+<div id="stackWrapper">
+<div class="stack">
+
+<div class="bg-paper" data-base-rotate="-6" data-base-x="-30" data-base-y="18" style="transform: translate(-30px, 18px) rotate(-6deg);">
+  <div class="mini-header">UCNI Communique — Mess Intelligence Update</div>
+  <div style="position:absolute; top:76px; bottom:56px; left:0; right:0; overflow:auto; padding:10px 18px; font-size:16px; line-height:2.1;">
+    <h4 style="margin:10px 0 8px 0; text-transform:uppercase; letter-spacing:0.5px;">Just a Drink</h4>
+    <p>
+      <span class="doc-code">REF: JD-4471-K</span><br>
+      <span class="redact" style="width:65%; height:1.3em;"></span><br>
+      <span class="redact" style="width:120px;"></span> <span class="redact" style="width:40px;"></span> <strong>Lt Cmdr Ed Bell</strong> and <strong>Lt Jasmine Hanover</strong> <span class="redact" style="width:90px;"></span><br>
+      <span class="redact" style="width:95%; height:1.3em;"></span><br>
+      <span class="redact" style="width:30px;"></span> <span class="redact" style="width:200px;"></span> <span class="redact" style="width:55px;"></span><br>
+      <span class="redact" style="width:75%; height:1.3em;"></span><br>
+      <span class="redact" style="width:85%; height:1.3em;"></span><br>
+      <span class="redact" style="width:55%; height:1.3em;"></span><br>
+      <strong>Duty roster should be updated.</strong>
+    </p>
+
+    <h4 style="margin:22px 0 8px 0; text-transform:uppercase; letter-spacing:0.5px;">What Happens on Xanadu</h4>
+    <p>
+      <span class="doc-code">REF: XN-0892-C · CODE: BLACKOUT-7</span><br>
+      <span class="redact" style="width:80%; height:1.3em;"></span><br>
+      <span class="redact" style="width:50px;"></span> <span class="redact" style="width:90px;"></span> <strong>Cmdr Angharad Talbot</strong><br>
+      <span class="redact" style="width:65%; height:1.3em;"></span><br>
+      <span class="redact" style="width:210px;"></span> <strong>SYN Xanadu</strong> <span class="redact" style="width:35px;"></span><br>
+      <span class="redact" style="width:90%; height:1.3em;"></span><br>
+      <span class="redact" style="width:100px;"></span> <strong>Alta Garotte</strong> <span class="redact" style="width:130px;"></span> <strong>Bouncer</strong><br>
+      <span class="redact" style="width:70%; height:1.3em;"></span><br>
+      <span class="redact" style="width:40%; height:1.3em;"></span>
+    </p>
+
+    <h4 style="margin:22px 0 8px 0; text-transform:uppercase; letter-spacing:0.5px;">Wedding Bells</h4>
+    <p>
+      <span class="doc-code">REF: WB-1150-A</span> <strong>Civilian Details only</strong><br>
+      <span class="redact" style="width:100%; height:1.3em;"></span><br>
+      <span class="redact" style="width:75px;"></span> <span class="redact" style="width:180px;"></span><br>
+      <span class="redact" style="width:60%; height:1.3em;"></span><br>
+      <span class="redact" style="width:230px;"></span> <strong>Lt Leon Grant</strong> <span class="redact" style="width:50px;"></span><br>
+      <span class="redact" style="width:95%; height:1.3em;"></span><br>
+      <span class="redact" style="width:30px;"></span> <span class="redact" style="width:140px;"></span> <span class="redact" style="width:65px;"></span><br>
+      <span class="redact" style="width:80%; height:1.3em;"></span>
+    </p>
+
+    <div style="margin-top:22px;">
+      <span class="redact" style="width:100%; height:1.5em;"></span>
+      <span class="redact" style="width:85%; height:1.5em; margin-top:10px;"></span>
+      <span class="redact" style="width:95%; height:1.5em; margin-top:10px;"></span>
+      <span class="redact" style="width:70%; height:1.5em; margin-top:10px;"></span>
+      <span class="redact" style="width:90%; height:1.5em; margin-top:10px;"></span>
+      <span class="redact" style="width:60%; height:1.5em; margin-top:10px;"></span>
+      <span class="redact" style="width:100%; height:1.5em; margin-top:10px;"></span>
+      <span class="redact" style="width:80%; height:1.5em; margin-top:10px;"></span>
+    </div>
+  </div>
+  <div class="mini-footer">UCNI Communique — Internal Circulation Only</div>
+</div>
+
+<div class="bg-paper" data-base-rotate="5" data-base-x="26" data-base-y="10" style="transform: translate(26px, 10px) rotate(5deg);">
+  <div class="mini-header">Service Log — Full Record</div>
+  <div id="csvTableWrap" style="position:absolute; top:76px; bottom:56px; left:0; right:0; overflow:auto; padding:10px 14px;">
+    <form class="add-mission-form" style="display:flex; flex-wrap:wrap; gap:6px; align-items:end; font-size:11px; margin-bottom:10px;">
+      <label>Date (dd/mm/yyyy)<br><input type="text" class="f-date" placeholder="dd/mm/yyyy" pattern="\d{2}/\d{2}/\d{4}" required style="font-size:11px; width:90px;"></label>
+      <label>Ship<br>
+        <select class="f-ship" required style="font-size:11px;">
+          <option value="" disabled selected>Select ship</option>
+          <option value="UCS Havock">UCS Havock</option>
+          <option value="UCS Takanami">UCS Takanami</option>
+          <option value="Both Ships">Both Ships</option>
+          <option value="__other__">Other…</option>
+        </select>
+        <input type="text" class="f-ship-other" placeholder="Ship name" style="display:none; font-size:11px; width:80px;">
+      </label>
+      <label>Category<br>
+        <select class="f-category" required style="font-size:11px;">
+          <option value="" disabled selected>Select category</option>
+          <option value="Military">Military</option>
+          <option value="Exploration">Exploration</option>
+          <option value="Diplomacy">Diplomacy</option>
+          <option value="Intrigue">Intrigue</option>
+          <option value="Campaign">Campaign</option>
+          <option value="Special Event">Special Event</option>
+          <option value="Frontline">Frontline</option>
+          <option value="Officer">Officer</option>
+          <option value="__other__">Other…</option>
+        </select>
+        <input type="text" class="f-category-other" placeholder="Category name" style="display:none; font-size:11px; width:80px;">
+      </label>
+      <label>Mission<br><input type="text" class="f-mission" required style="font-size:11px; width:120px;"></label>
+      <button type="submit" style="font-size:11px;">Add mission</button>
+    </form>
+    <table id="csvTable" style="width:100%; border-collapse:collapse; font-size:11px;"></table>
+    <p><button type="button" id="downloadBtn" style="font-size:11px;">Download modified CSV</button></p>
+  </div>
+  <div class="mini-footer"><span class="doc-code">REF: SL-2201-R</span></div>
+</div>
+
+<div class="page">
+<h1 style="background:#283372; color:white; font-family:'Exo 2', sans-serif; margin:0; padding:32px 20px; font-size:2.2em; display:flex; justify-content:space-between; align-items:center; gap:20px;">
+  <span>SERVICE RECORD REVIEW</span>
+  <input type="text" id="userName" placeholder="Your name" style="font-family:'Exo 2', sans-serif; font-size:1em; font-weight:bold; padding:8px 4px; border:none; border-bottom:1px solid transparent; background:transparent; color:white; text-align:right; outline:none; flex:1; min-width:0;"
+    onfocus="this.style.borderBottomColor='white'" onblur="this.style.borderBottomColor='transparent'">
+</h1>
+<main style="display:flex; gap:30px; padding:0 60px; align-items:stretch;">
+<div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+<h2>Officer History:</h2>
+<label id="uploadBox" for="fileInput" style="display:flex; align-items:center; justify-content:center; width:100%; max-width:900px; aspect-ratio:900/650; border:2px dashed black; box-sizing:border-box; font-size:1.4em; text-align:center; cursor:pointer;">
+  Upload CSV from Service Record
+</label>
+<input type="file" id="fileInput" accept=".csv" style="display:none;">
+<svg id="chart" viewBox="0 0 900 650" style="width:100%; height:auto; max-width:900px; display:none;"></svg>
+<div id="info"></div>
+<div id="legend" style="margin-top:8px;"></div>
+
+<h2>Officer Performance Report:</h2>
+<div id="trainingRecs"></div>
+
+<div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+  <p id="reviewLine"></p>
+  <div class="signatures">
+    <div class="signature-block">
+      <div class="signature-line"><input type="text" class="signature-input" id="userSignature" placeholder="Sign here"></div>
+      <div class="signature-caption">Officer under Review</div>
+    </div>
+    <div class="signature-block">
+      <div class="signature-line"><span class="signature-text">Sam Hutton</span></div>
+      <div class="signature-caption">Countersigned by Sub-Lt Sam Hutton, Science Division</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<aside style="width:340px; flex-shrink:0; background:#eee; border:1px solid #ccc; border-radius:6px; padding:24px; box-sizing:border-box; text-align:center; display:flex; flex-direction:column;">
+  <h3 style="margin:0 0 14px 0; font-size:15px; letter-spacing:0.5px;">AUTHORISATION</h3>
+  <span class="status-btn" id="auth-diplomatic">Diplomatic<br>Protocol</span>
+  <span class="status-btn" id="auth-engage">Engage With<br>Discretion</span>
+  <span class="status-btn" id="auth-seek">Seek And<br>Destroy</span>
+
+  <h3 style="margin:24px 0 14px 0; font-size:15px; letter-spacing:0.5px;">THREAT LEVEL</h3>
+  <span class="status-btn" id="threat-monitor">Monitor</span>
+  <span class="status-btn" id="threat-alert">Alert</span>
+  <span class="status-btn" id="threat-active">Active</span>
+
+  <h3 style="margin:24px 0 14px 0; font-size:15px; letter-spacing:0.5px;">MOST RECENT MISSIONS</h3>
+  <ul id="recentMissions" style="text-align:left; list-style:none; margin:0; padding:0; font-size:17px; display:flex; flex-direction:column; gap:12px;"></ul>
+</aside>
+</main>
+
+<p style="padding:0 60px 20px 60px; font-size:11px; color:#666; text-align:center;">This page is unofficial and unaffiliated with Bridge Command or the London Space Elevator Limited. Contact sam@sam0fc.com</p>
+
+<footer style="background:linear-gradient(#3a4a9e, #283372); color:white; font-family:'Exo 2', sans-serif; margin:0; padding:28px 20px; font-size:2em; text-align:center;">
+  UCS Warspite
+  <div style="font-size:0.55em; font-weight:normal; margin-top:8px; letter-spacing:0.5px; opacity:0.85;">
+    TOP SECRET. Access granted to Duty Officers with appropriate clearance ONLY.
+  </div>
+</footer>
+</div>
+
+</div>
+</div>
+
+<script>
+// the CSV holds real-world dates; everything shown to the user is shifted
+// this many years into the future to match the in-universe setting
+const YEAR_OFFSET = 156;
+
+// takes an ISO 'YYYY-MM-DD' string (or a Date), returns an ISO string with
+// YEAR_OFFSET added — for display/export only, never used for date math
+function shiftDate(dateStrOrDate) {
+  const d = (dateStrOrDate instanceof Date) ? dateStrOrDate : new Date(dateStrOrDate);
+  const yyyy = d.getUTCFullYear() + YEAR_OFFSET;
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return yyyy + '-' + mm + '-' + dd;
+}
+
+function parseCSV(text) {
+  // strip BOM
+  text = text.replace(/^﻿/, '');
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  const headers = splitCSVLine(lines[0]);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const fields = splitCSVLine(lines[i]);
+    const row = {};
+    headers.forEach((h, idx) => row[h] = fields[idx]);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function splitCSVLine(line) {
+  const result = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQuotes = false;
+      } else cur += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { result.push(cur); cur = ''; }
+      else cur += c;
+    }
+  }
+  result.push(cur);
+  return result;
+}
+
+function loadCsvFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (evt) {
+    const rows = parseCSV(evt.target.result);
+    markers = [];
+    currentRows = rows;
+    document.getElementById('uploadBox').style.display = 'none';
+    document.getElementById('chart').style.display = 'block';
+    render(currentRows);
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('fileInput').addEventListener('change', function (e) {
+  loadCsvFile(e.target.files[0]);
+});
+
+const uploadBox = document.getElementById('uploadBox');
+uploadBox.addEventListener('dragover', function (e) {
+  e.preventDefault();
+  uploadBox.style.background = '#f0f0f0';
+});
+uploadBox.addEventListener('dragleave', function () {
+  uploadBox.style.background = '';
+});
+uploadBox.addEventListener('drop', function (e) {
+  e.preventDefault();
+  uploadBox.style.background = '';
+  loadCsvFile(e.dataTransfer.files[0]);
+});
+
+// wires up an "add missing mission" form (there's one on the front page and
+// one on the Fleet Log paper); both share this same logic via classes rather
+// than ids, since ids must be unique per page
+function wireAddForm(form) {
+  const shipSelect = form.querySelector('.f-ship');
+  const shipOther = form.querySelector('.f-ship-other');
+  const categorySelect = form.querySelector('.f-category');
+  const categoryOther = form.querySelector('.f-category-other');
+
+  shipSelect.addEventListener('change', function () {
+    shipOther.style.display = this.value === '__other__' ? 'inline' : 'none';
+  });
+  categorySelect.addEventListener('change', function () {
+    categoryOther.style.display = this.value === '__other__' ? 'inline' : 'none';
+  });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const dateInput = form.querySelector('.f-date').value;
+    const dateMatch = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dateInput);
+    if (!dateMatch) { alert('Date must be in dd/mm/yyyy format'); return; }
+    const date = dateMatch[3] + '-' + dateMatch[2] + '-' + dateMatch[1];
+    let ship = shipSelect.value;
+    if (ship === '__other__') ship = shipOther.value;
+    let category = categorySelect.value;
+    if (category === '__other__') category = categoryOther.value;
+    const mission = form.querySelector('.f-mission').value;
+    if (!date || !ship || !category || !mission) return;
+
+    currentRows.push({ Date: date, Ship: ship, Category: category, Mission: mission });
+    render(currentRows);
+    form.reset();
+    shipOther.style.display = 'none';
+    categoryOther.style.display = 'none';
+  });
+}
+
+document.querySelectorAll('.add-mission-form').forEach(wireAddForm);
+
+document.getElementById('downloadBtn').addEventListener('click', function () {
+  const csv = toCSV(currentRows);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bridge-command-deployments.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+function csvField(v) {
+  v = (v === undefined || v === null) ? '' : String(v);
+  return '"' + v.replace(/"/g, '""') + '"';
+}
+
+function toCSV(rows) {
+  const headers = ['Date', 'Ship', 'Category', 'Mission'];
+  const lines = [headers.map(csvField).join(',')];
+  rows.forEach(r => {
+    lines.push(headers.map(h => csvField(h === 'Date' ? shiftDate(r[h]) : r[h])).join(','));
+  });
+  return lines.join('\r\n');
+}
+
+// rows currently loaded, kept so the add-mission form can append to them
+let currentRows = [];
+// user-added vertical marker lines: { time, label }
+let markers = [];
+// set by drawChart on every render so marker code can convert between pixels and time
+let scale = null;
+
+const CATEGORY_COLORS = {
+  military: 'red',
+  exploration: 'blue',
+  diplomacy: 'green',
+  intrigue: 'plum',
+  campaign: 'orange',
+  special: 'darkblue',
+  frontline: 'yellow'
+};
+
+function render(rows) {
+  const dated = rows.filter(r => r.Date).sort((a, b) => a.Date < b.Date ? -1 : a.Date > b.Date ? 1 : 0);
+
+  document.getElementById('info').textContent = dated.length + ' missions recorded, from ' + shiftDate(dated[0].Date) + ' to ' + shiftDate(dated[dated.length - 1].Date);
+
+  // one point per mission, y = running cumulative count
+  const points = dated.map((r, i) => ({
+    date: r.Date,
+    cumulative: i + 1,
+    category: r.Category || '',
+    ship: r.Ship || '',
+    mission: r.Mission || ''
+  }));
+
+  drawChart(points);
+  updateStatusPanel(points);
+  renderCsvTable(dated);
+  renderTrainingRecs(dated);
+  renderRecentMissions(points);
+}
+
+function renderRecentMissions(points) {
+  const list = document.getElementById('recentMissions');
+  list.innerHTML = '';
+  const recent = points.slice(-5).reverse();
+  recent.forEach(p => {
+    const catLower = (p.category || '').toLowerCase();
+    const catKey = Object.keys(CATEGORY_COLORS).find(k => catLower.includes(k));
+    const color = catKey ? CATEGORY_COLORS[catKey] : '#999';
+
+    const li = document.createElement('li');
+    li.style.background = 'color-mix(in srgb, ' + color + ' 35%, white)';
+    li.style.color = 'black';
+    li.style.padding = '10px 12px';
+    li.style.borderRadius = '6px';
+
+    const dateSpan = document.createElement('div');
+    dateSpan.style.opacity = '0.75';
+    dateSpan.style.fontSize = '0.8em';
+    dateSpan.textContent = shiftDate(p.date) + ' — ' + p.ship;
+    const missionSpan = document.createElement('div');
+    missionSpan.style.fontWeight = 'bold';
+    missionSpan.textContent = p.mission;
+    li.appendChild(dateSpan);
+    li.appendChild(missionSpan);
+    list.appendChild(li);
+  });
+}
+
+const TRAINING_TARGETS = {
+  military: 10,
+  exploration: 7,
+  diplomacy: 7,
+  intrigue: 7,
+  campaign: 15
+};
+
+function renderTrainingRecs(rows) {
+  const container = document.getElementById('trainingRecs');
+  container.innerHTML = '';
+
+  // lowest-percentage mission type, counted fleet-wide by unique mission name (no duplicates)
+  let worstCat = null, worstCatPct = Infinity;
+  Object.keys(TRAINING_TARGETS).forEach(catKey => {
+    const target = TRAINING_TARGETS[catKey];
+    const uniqueMissions = new Set(
+      rows
+        .filter(r => (r.Category || '').toLowerCase().includes(catKey))
+        // campaign rows all share the same Mission text ("CAMPAIGN DEPLOYMENT");
+        // the campaign's identity lives in Category instead, so dedupe on that
+        .map(r => catKey === 'campaign' ? (r.Category || '').trim().toLowerCase() : (r.Mission || '').trim().toLowerCase())
+    );
+    const pct = uniqueMissions.size / target;
+    if (pct < worstCatPct) { worstCatPct = pct; worstCat = catKey; }
+  });
+
+  // ship with the fewest unique missions flown overall
+  let worstShip = null, worstShipCount = Infinity;
+  ['Havock', 'Takanami'].forEach(shipKey => {
+    const uniqueMissions = new Set(
+      rows
+        .filter(r => (r.Ship || '').toLowerCase().includes(shipKey.toLowerCase()))
+        .map(r => (r.Mission || '').trim().toLowerCase())
+    );
+    if (uniqueMissions.size < worstShipCount) { worstShipCount = uniqueMissions.size; worstShip = shipKey; }
+  });
+
+  const catLabel = worstCat.charAt(0).toUpperCase() + worstCat.slice(1);
+
+  const list = document.createElement('ul');
+
+  const li1 = document.createElement('li');
+  li1.appendChild(document.createTextNode('Recommend remedial training on UCS '));
+  const shipMark = document.createElement('mark');
+  shipMark.textContent = worstShip;
+  shipMark.title = 'The ship with the fewest unique missions flown overall.';
+  li1.appendChild(shipMark);
+  li1.appendChild(document.createTextNode(' and on '));
+  const catMark = document.createElement('mark');
+  catMark.textContent = catLabel;
+  catMark.title = 'The mission type furthest below its total, as a percentage.';
+  li1.appendChild(catMark);
+  li1.appendChild(document.createTextNode(' protocol.'));
+  list.appendChild(li1);
+
+  const total = rows.length;
+  let deploymentWord;
+  if (total >= 100) deploymentWord = 'a ridiculous number of';
+  else if (total >= 50) deploymentWord = 'a huge number of';
+  else if (total >= 10) deploymentWord = 'many';
+  else if (total >= 2) deploymentWord = 'some';
+  else if (total >= 1) deploymentWord = 'one';
+  else deploymentWord = 'no';
+
+  const li2 = document.createElement('li');
+  li2.appendChild(document.createTextNode('Officer has completed '));
+  const totalMark = document.createElement('mark');
+  totalMark.textContent = deploymentWord;
+  totalMark.title = 'Picked from the total mission count: 1=one, 2-9=some, 10-49=many, 50-99=a huge number of, 100+=a ridiculous number of.';
+  li2.appendChild(totalMark);
+  li2.appendChild(document.createTextNode(' deployments.'));
+  list.appendChild(li2);
+
+  const frontlineCount = rows.filter(r => (r.Category || '').toLowerCase().includes('frontline')).length;
+  const li3 = document.createElement('li');
+  li3.appendChild(document.createTextNode('Officer has made good progress on the front in '));
+  const frontMark = document.createElement('mark');
+  frontMark.textContent = frontlineCount;
+  frontMark.title = 'Count of missions with category Frontline.';
+  li3.appendChild(frontMark);
+  li3.appendChild(document.createTextNode(' frontline deployments.'));
+  list.appendChild(li3);
+
+  const li4 = document.createElement('li');
+  li4.appendChild(document.createTextNode('Officer has now completed '));
+  const totalMissionsMark = document.createElement('mark');
+  totalMissionsMark.textContent = total;
+  totalMissionsMark.title = 'Total number of missions loaded.';
+  li4.appendChild(totalMissionsMark);
+  li4.appendChild(document.createTextNode(' missions in the Adamas Belt and is therefore considered combat experienced.'));
+  list.appendChild(li4);
+
+  container.appendChild(list);
+}
+
+function renderCsvTable(rows) {
+  const table = document.getElementById('csvTable');
+  table.innerHTML = '';
+
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  ['Date', 'Ship', 'Category', 'Mission'].forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    th.style.textAlign = 'left';
+    th.style.borderBottom = '1px solid black';
+    th.style.padding = '3px 6px';
+    th.style.position = 'sticky';
+    th.style.top = '0';
+    th.style.background = 'white';
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    ['Date', 'Ship', 'Category', 'Mission'].forEach(key => {
+      const td = document.createElement('td');
+      td.textContent = key === 'Date' ? shiftDate(r[key]) : (r[key] || '');
+      td.style.borderBottom = '1px solid #ddd';
+      td.style.padding = '3px 6px';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+}
+
+function updateStatusPanel(points) {
+  // percentage against each category's own target (TRAINING_TARGETS), deduped by unique mission name
+  const pctOfTarget = key => {
+    const uniqueMissions = new Set(
+      points
+        .filter(p => (p.category || '').toLowerCase().includes(key))
+        // campaign rows all share the same Mission text ("CAMPAIGN DEPLOYMENT");
+        // the campaign's identity lives in Category instead, so dedupe on that
+        .map(p => key === 'campaign' ? (p.category || '').trim().toLowerCase() : (p.mission || '').trim().toLowerCase())
+    );
+    return uniqueMissions.size / TRAINING_TARGETS[key];
+  };
+
+  const diplomacyPct = pctOfTarget('diplomacy');
+  const intriguePct = pctOfTarget('intrigue');
+  const militaryPct = pctOfTarget('military');
+
+  // authorisation: whichever of diplomacy / intrigue / military has the highest share wins
+  document.querySelectorAll('#auth-diplomatic, #auth-engage, #auth-seek').forEach(el => el.classList.remove('active-auth'));
+  let authId = 'auth-diplomatic';
+  let best = diplomacyPct;
+  if (intriguePct > best) { best = intriguePct; authId = 'auth-engage'; }
+  if (militaryPct > best) { best = militaryPct; authId = 'auth-seek'; }
+  document.getElementById(authId).classList.add('active-auth');
+
+  document.getElementById('auth-diplomatic').title = 'More Diplomacy missions than any other (' + Math.round(diplomacyPct * 100) + '%)';
+  document.getElementById('auth-engage').title = 'More Intrigue missions than any other (' + Math.round(intriguePct * 100) + '%)';
+  document.getElementById('auth-seek').title = 'More Military missions than any other (' + Math.round(militaryPct * 100) + '%)';
+
+  // threat level: driven by mission count in the last 30 days (relative to the latest mission date)
+  document.querySelectorAll('#threat-monitor, #threat-alert, #threat-active').forEach(el => el.classList.remove('active-threat'));
+  let recentCount = 0;
+  if (points.length) {
+    const latest = points.reduce((max, p) => {
+      const t = new Date(p.date).getTime();
+      return t > max ? t : max;
+    }, -Infinity);
+    const cutoff = latest - 30 * 24 * 60 * 60 * 1000;
+    recentCount = points.filter(p => new Date(p.date).getTime() >= cutoff).length;
+  }
+  let threatId;
+  if (recentCount >= 5) threatId = 'threat-active';
+  else if (recentCount >= 1) threatId = 'threat-alert';
+  else threatId = 'threat-monitor';
+  document.getElementById(threatId).classList.add('active-threat');
+
+  document.getElementById('threat-monitor').title = 'No missions in the last 30 days';
+  document.getElementById('threat-alert').title = '1-4 missions in the last 30 days';
+  document.getElementById('threat-active').title = '5+ missions in the last 30 days';
+}
+
+function drawChart(points) {
+  const svg = document.getElementById('chart');
+  svg.innerHTML = '';
+  const W = 900, H = 650, margin = { top: 35, right: 20, bottom: 80, left: 50 };
+  const plotW = W - margin.left - margin.right;
+  const plotH = H - margin.top - margin.bottom;
+  const PAD = 15; // inset so points/lines at the first and last date aren't clipped at the plot edge
+
+  const maxY = points[points.length - 1].cumulative;
+  const n = points.length;
+
+  const minTime = new Date(points[0].date).getTime();
+  const maxTime = new Date(points[n - 1].date).getTime();
+  const timeSpan = maxTime - minTime;
+
+  function x(i) {
+    if (timeSpan === 0) return margin.left + plotW / 2;
+    const t = new Date(points[i].date).getTime();
+    return margin.left + PAD + ((t - minTime) / timeSpan) * (plotW - 2 * PAD);
+  }
+  function y(v) { return margin.top + plotH - (v / maxY) * plotH; }
+
+  function xForTime(t) {
+    if (timeSpan === 0) return margin.left + plotW / 2;
+    return margin.left + PAD + ((t - minTime) / timeSpan) * (plotW - 2 * PAD);
+  }
+  function timeForX(px) {
+    const innerW = plotW - 2 * PAD;
+    const clamped = Math.max(margin.left + PAD, Math.min(margin.left + PAD + innerW, px));
+    if (timeSpan === 0) return minTime;
+    return minTime + ((clamped - margin.left - PAD) / innerW) * timeSpan;
+  }
+
+  scale = { margin, plotW, plotH, xForTime, timeForX };
+
+  const ns = 'http://www.w3.org/2000/svg';
+
+  // axes
+  const xAxis = document.createElementNS(ns, 'line');
+  xAxis.setAttribute('x1', margin.left);
+  xAxis.setAttribute('y1', margin.top + plotH);
+  xAxis.setAttribute('x2', margin.left + plotW);
+  xAxis.setAttribute('y2', margin.top + plotH);
+  xAxis.setAttribute('stroke', 'black');
+  svg.appendChild(xAxis);
+
+  const yAxis = document.createElementNS(ns, 'line');
+  yAxis.setAttribute('x1', margin.left);
+  yAxis.setAttribute('y1', margin.top);
+  yAxis.setAttribute('x2', margin.left);
+  yAxis.setAttribute('y2', margin.top + plotH);
+  yAxis.setAttribute('stroke', 'black');
+  svg.appendChild(yAxis);
+
+  // y ticks
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const v = Math.round((maxY / yTicks) * i);
+    const yy = y(v);
+    const tick = document.createElementNS(ns, 'line');
+    tick.setAttribute('x1', margin.left - 5);
+    tick.setAttribute('y1', yy);
+    tick.setAttribute('x2', margin.left);
+    tick.setAttribute('y2', yy);
+    tick.setAttribute('stroke', 'black');
+    svg.appendChild(tick);
+
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', margin.left - 8);
+    label.setAttribute('y', yy + 4);
+    label.setAttribute('text-anchor', 'end');
+    label.setAttribute('font-size', '16');
+    label.textContent = v;
+    svg.appendChild(label);
+  }
+
+  // x ticks: evenly spaced in time, not by point index
+  const xTickCount = 10;
+  for (let i = 0; i <= xTickCount; i++) {
+    const t = minTime + (timeSpan * i / xTickCount);
+    const xx = xForTime(t);
+    const tick = document.createElementNS(ns, 'line');
+    tick.setAttribute('x1', xx);
+    tick.setAttribute('y1', margin.top + plotH);
+    tick.setAttribute('x2', xx);
+    tick.setAttribute('y2', margin.top + plotH + 5);
+    tick.setAttribute('stroke', 'black');
+    svg.appendChild(tick);
+
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', xx);
+    label.setAttribute('y', margin.top + plotH + 5);
+    label.setAttribute('font-size', '15');
+    label.setAttribute('text-anchor', 'end');
+    label.setAttribute('transform', 'rotate(-45 ' + xx + ' ' + (margin.top + plotH + 5) + ')');
+    label.textContent = shiftDate(new Date(t));
+    svg.appendChild(label);
+  }
+
+  // line path
+  let d = '';
+  points.forEach((p, i) => {
+    const cmd = i === 0 ? 'M' : 'L';
+    d += cmd + x(i) + ',' + y(p.cumulative) + ' ';
+  });
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', 'black');
+  path.setAttribute('stroke-width', '2');
+  svg.appendChild(path);
+
+  // dots: color by mission category, shape by ship
+  points.forEach((p, i) => {
+    const cx = x(i), cy = y(p.cumulative);
+    const catLower = (p.category || '').toLowerCase();
+    const catKey = Object.keys(CATEGORY_COLORS).find(k => catLower.includes(k));
+    const color = catKey ? CATEGORY_COLORS[catKey] : 'black';
+    const shipLower = (p.ship || '').toLowerCase();
+    const r = 7;
+    let shape;
+    if (shipLower.includes('havock')) {
+      // triangle pointing right
+      shape = document.createElementNS(ns, 'polygon');
+      shape.setAttribute('points', [
+        (cx - r) + ',' + (cy - r),
+        (cx - r) + ',' + (cy + r),
+        (cx + r) + ',' + cy
+      ].join(' '));
+    } else if (shipLower.includes('takanami')) {
+      // triangle pointing left
+      shape = document.createElementNS(ns, 'polygon');
+      shape.setAttribute('points', [
+        (cx + r) + ',' + (cy - r),
+        (cx + r) + ',' + (cy + r),
+        (cx - r) + ',' + cy
+      ].join(' '));
+    } else {
+      shape = document.createElementNS(ns, 'circle');
+      shape.setAttribute('cx', cx);
+      shape.setAttribute('cy', cy);
+      shape.setAttribute('r', r);
+    }
+    shape.setAttribute('fill', color);
+
+    const g = document.createElementNS(ns, 'g');
+    g.appendChild(shape);
+
+    // larger invisible hit area so hovering near the point still triggers the tooltip
+    const hit = document.createElementNS(ns, 'circle');
+    hit.setAttribute('cx', cx);
+    hit.setAttribute('cy', cy);
+    hit.setAttribute('r', 12);
+    hit.setAttribute('fill', 'transparent');
+    g.appendChild(hit);
+
+    const tooltipText = p.mission + '\n' + shiftDate(p.date) + '\n' + p.ship + ' — ' + p.category + '\nCumulative: ' + p.cumulative;
+    g.addEventListener('mouseenter', evt => showTooltip(evt, tooltipText));
+    g.addEventListener('mousemove', evt => moveTooltip(evt));
+    g.addEventListener('mouseleave', hideTooltip);
+
+    svg.appendChild(g);
+  });
+
+  svg.onclick = function (evt) {
+    if (evt.target.closest('.marker')) return;
+    const pt = svgPoint(svg, evt);
+    if (pt.x < margin.left || pt.x > margin.left + plotW || pt.y < margin.top || pt.y > margin.top + plotH) return;
+    const label = prompt('Label for this line:');
+    if (label === null) return;
+    markers.push({ time: timeForX(pt.x), label: label });
+    renderMarkers();
+  };
+
+  renderMarkers();
+  renderLegend();
+  if (typeof fitStackToViewport === 'function') setTimeout(fitStackToViewport, 0);
+}
+
+function renderLegend() {
+  const legend = document.getElementById('legend');
+  legend.innerHTML = '';
+
+  const colorGroup = document.createElement('div');
+  colorGroup.style.display = 'grid';
+  colorGroup.style.gridTemplateColumns = 'repeat(auto-fill, 110px)';
+  colorGroup.style.rowGap = '8px';
+  Object.keys(CATEGORY_COLORS).forEach(key => {
+    const item = document.createElement('span');
+    const swatch = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    swatch.setAttribute('width', '12');
+    swatch.setAttribute('height', '12');
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', 6);
+    circle.setAttribute('cy', 6);
+    circle.setAttribute('r', 6);
+    circle.setAttribute('fill', CATEGORY_COLORS[key]);
+    swatch.appendChild(circle);
+    item.appendChild(swatch);
+    item.appendChild(document.createTextNode(' ' + key.charAt(0).toUpperCase() + key.slice(1)));
+    colorGroup.appendChild(item);
+  });
+
+  const shapeGroup = document.createElement('div');
+  shapeGroup.style.display = 'grid';
+  shapeGroup.style.gridTemplateColumns = 'repeat(auto-fill, 110px)';
+  shapeGroup.style.rowGap = '8px';
+  shapeGroup.style.marginTop = '8px';
+  [
+    { label: 'Havock', points: '2,2 2,12 12,7' },
+    { label: 'Takanami', points: '12,2 12,12 2,7' },
+    { label: 'Other ship', circle: true }
+  ].forEach(entry => {
+    const item = document.createElement('span');
+    const swatch = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    swatch.setAttribute('width', '14');
+    swatch.setAttribute('height', '14');
+    let shape;
+    if (entry.circle) {
+      shape = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      shape.setAttribute('cx', 7);
+      shape.setAttribute('cy', 7);
+      shape.setAttribute('r', 5);
+    } else {
+      shape = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      shape.setAttribute('points', entry.points);
+    }
+    shape.setAttribute('fill', 'black');
+    swatch.appendChild(shape);
+    item.appendChild(swatch);
+    item.appendChild(document.createTextNode(' ' + entry.label));
+    shapeGroup.appendChild(item);
+  });
+
+  legend.appendChild(colorGroup);
+  legend.appendChild(shapeGroup);
+}
+
+function showTooltip(evt, text) {
+  const tooltip = document.getElementById('tooltip');
+  tooltip.textContent = '';
+  text.split('\n').forEach(line => {
+    tooltip.appendChild(document.createTextNode(line));
+    tooltip.appendChild(document.createElement('br'));
+  });
+  tooltip.style.display = 'block';
+  moveTooltip(evt);
+}
+
+function moveTooltip(evt) {
+  const tooltip = document.getElementById('tooltip');
+  tooltip.style.left = (evt.pageX + 14) + 'px';
+  tooltip.style.top = (evt.pageY + 14) + 'px';
+}
+
+function hideTooltip() {
+  document.getElementById('tooltip').style.display = 'none';
+}
+
+function svgPoint(svg, evt) {
+  const rect = svg.getBoundingClientRect();
+  return {
+    x: (evt.clientX - rect.left) * (svg.viewBox.baseVal.width || svg.width.baseVal.value) / rect.width,
+    y: (evt.clientY - rect.top) * (svg.viewBox.baseVal.height || svg.height.baseVal.value) / rect.height
+  };
+}
+
+function renderMarkers() {
+  const svg = document.getElementById('chart');
+  if (!scale) return;
+  const ns = 'http://www.w3.org/2000/svg';
+  svg.querySelectorAll('.marker').forEach(el => el.remove());
+
+  const { margin, plotH, xForTime } = scale;
+
+  markers.forEach((marker, idx) => {
+    const xx = xForTime(marker.time);
+    const g = document.createElementNS(ns, 'g');
+    g.setAttribute('class', 'marker');
+
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', xx);
+    line.setAttribute('y1', margin.top);
+    line.setAttribute('x2', xx);
+    line.setAttribute('y2', margin.top + plotH);
+    line.setAttribute('stroke', 'black');
+    line.setAttribute('stroke-dasharray', '4 3');
+    g.appendChild(line);
+
+    const handleY = margin.top + plotH + 14;
+    const handle = document.createElementNS(ns, 'circle');
+    handle.setAttribute('cx', xx);
+    handle.setAttribute('cy', handleY);
+    handle.setAttribute('r', 4);
+    handle.setAttribute('fill', 'black');
+    handle.style.cursor = 'ew-resize';
+    handle.addEventListener('mousedown', function (evt) {
+      evt.stopPropagation();
+      startDrag(idx, evt);
+    });
+    handle.addEventListener('dblclick', function (evt) {
+      evt.stopPropagation();
+      if (confirm('Delete this line?')) {
+        markers.splice(idx, 1);
+        renderMarkers();
+      }
+    });
+    g.appendChild(handle);
+
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', xx);
+    label.setAttribute('y', margin.top - 6);
+    label.setAttribute('font-size', '15');
+    label.setAttribute('text-anchor', 'middle');
+    label.textContent = marker.label;
+    label.style.cursor = 'text';
+    label.addEventListener('dblclick', function (evt) {
+      evt.stopPropagation();
+      const newLabel = prompt('Label for this line:', marker.label);
+      if (newLabel !== null) {
+        marker.label = newLabel;
+        renderMarkers();
+      }
+    });
+    g.appendChild(label);
+
+    svg.appendChild(g);
+  });
+}
+
+function startDrag(idx, evt) {
+  const svg = document.getElementById('chart');
+  function onMove(moveEvt) {
+    const pt = svgPoint(svg, moveEvt);
+    markers[idx].time = scale.timeForX(pt.x);
+    renderMarkers();
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+// makes an element behave like a loose sheet of paper: draggable, and it
+// stays wherever it's dropped (the drop point becomes its new resting spot)
+function makeDraggablePaper(el, opts) {
+  opts = opts || {};
+  let baseX = opts.baseX || 0;
+  let baseY = opts.baseY || 0;
+  let baseRotate = opts.baseRotate || 0;
+
+  let dragging = false;
+  let startX = 0, startY = 0;
+
+  function setTransform(x, y, rot) {
+    el.style.transform = 'translate(' + x + 'px, ' + y + 'px) rotate(' + rot + 'deg)';
+  }
+
+  setTransform(baseX, baseY, baseRotate);
+
+  el.addEventListener('mousedown', function (evt) {
+    const interactive = evt.target.closest('input, select, button, textarea, a, svg, label');
+    if (interactive) return;
+    dragging = true;
+    startX = evt.clientX;
+    startY = evt.clientY;
+    el.classList.add('dragging');
+    el.style.animation = 'none';
+    el.style.zIndex = 100;
+  });
+
+  document.addEventListener('mousemove', function (evt) {
+    if (!dragging) return;
+    const dx = evt.clientX - startX, dy = evt.clientY - startY;
+    const rot = baseRotate + Math.max(-8, Math.min(8, dx / 15));
+    setTransform(baseX + dx, baseY + dy, rot);
+  });
+
+  document.addEventListener('mouseup', function (evt) {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    el.style.zIndex = '';
+    // the drop point becomes the new resting position
+    baseX += evt.clientX - startX;
+    baseY += evt.clientY - startY;
+    baseRotate += Math.max(-8, Math.min(8, (evt.clientX - startX) / 15));
+    setTransform(baseX, baseY, baseRotate);
+  });
+}
+
+makeDraggablePaper(document.querySelector('.page'), { baseX: 0, baseY: 0, baseRotate: 0 });
+document.querySelectorAll('.bg-paper').forEach(function (el) {
+  makeDraggablePaper(el, {
+    baseX: parseFloat(el.dataset.baseX) || 0,
+    baseY: parseFloat(el.dataset.baseY) || 0,
+    baseRotate: parseFloat(el.dataset.baseRotate) || 0
+  });
+});
+
+// mobile: show the papers as a real stack, with the ones behind peeking out
+// at the bottom — tap a peeking corner to bring that paper to the front
+(function () {
+  const bgPapers = document.querySelectorAll('.bg-paper');
+  const mobilePages = [
+    { el: document.querySelector('.page'), label: 'Service Record' },
+    { el: bgPapers[1], label: 'Fleet Log' },
+    { el: bgPapers[0], label: 'Mess Intelligence' }
+  ];
+
+  // order[0] is on top (the readable page), order[1]/order[2] peek out behind it
+  let order = [0, 1, 2];
+  const peekClasses = ['mobile-active', 'mobile-peek-1', 'mobile-peek-2'];
+
+  function applyStackOrder() {
+    mobilePages.forEach(function (p) {
+      p.el.classList.remove('mobile-active', 'mobile-peek-1', 'mobile-peek-2');
+    });
+    order.forEach(function (pageIdx, stackPos) {
+      mobilePages[pageIdx].el.classList.add(peekClasses[stackPos]);
+    });
+    setTimeout(fitStackToViewport, 320);
+  }
+
+  function bringToFront(pageIdx) {
+    if (order[0] === pageIdx) return;
+    order = [pageIdx].concat(order.filter(function (i) { return i !== pageIdx; }));
+    applyStackOrder();
+  }
+
+  mobilePages.forEach(function (p, idx) {
+    p.el.addEventListener('click', function (e) {
+      // only the peeking (non-front) papers respond to a tap; a tap on the
+      // front page's own content should behave normally (buttons, chart, etc.)
+      if (order[0] === idx) return;
+      e.preventDefault();
+      bringToFront(idx);
+    });
+  });
+
+  applyStackOrder();
+})();
+
+// zoom the whole stack out so its top and bottom always fit in the viewport
+const STACK_DESIGN_WIDTH = 1100; // must match the fixed width in the .stack CSS rule
+
+// how far (in unscaled design px) the furthest peeking paper sticks out below
+// the front page on mobile — must match the .mobile-peek-2 translateY value
+const MOBILE_PEEK_EXTRA = 460;
+
+function fitStackToViewport() {
+  const wrapper = document.getElementById('stackWrapper');
+  const stack = document.querySelector('.stack');
+  stack.style.transform = 'none';
+  let naturalHeight = stack.getBoundingClientRect().height;
+  const isMobileFlip = window.matchMedia('(max-width: 700px)').matches;
+  if (isMobileFlip) naturalHeight += MOBILE_PEEK_EXTRA;
+  const availableHeight = window.innerHeight - 80;
+  const availableWidth = window.innerWidth - 40;
+  // scale to fit both dimensions — the whole "poster" shrinks as one unit,
+  // it never reflows/crushes its (fixed-width) internal layout.
+  // Width uses the known design width directly (not a DOM measurement) so
+  // it can never be thrown off by measurement timing.
+  const widthScale = availableWidth / STACK_DESIGN_WIDTH;
+  const heightScale = availableHeight / naturalHeight;
+  const scale = Math.min(1, widthScale, heightScale) * 0.94;
+  stack.style.transform = 'scale(' + scale + ')';
+  wrapper.style.height = (naturalHeight * scale) + 'px';
+  wrapper.style.maxWidth = 'none';
+  wrapper.style.width = (STACK_DESIGN_WIDTH * scale) + 'px';
+}
+window.addEventListener('resize', fitStackToViewport);
+window.addEventListener('load', fitStackToViewport);
+setTimeout(fitStackToViewport, 0);
+
+(function () {
+  const today = new Date();
+  today.setUTCFullYear(today.getUTCFullYear() + YEAR_OFFSET);
+  document.getElementById('reviewLine').textContent =
+    'This officer passed review on ' + today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) + ', signed:';
+})();
+</script>
+</body>
+</html>
