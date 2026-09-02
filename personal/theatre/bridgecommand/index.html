@@ -29,8 +29,11 @@
   }
   #stackWrapper { width: 100%; max-width: 1100px; margin: 40px auto; overflow: visible; }
   /* fixed "poster" width — always laid out at full desktop size, then scaled
-     as a whole (never reflowed) to fit the viewport, so text never crushes */
-  .stack { position: relative; width: 1100px; transform-origin: top center; }
+     as a whole (never reflowed) to fit the viewport, so text never crushes.
+     The scale() here is a pure-CSS guarantee that it fits the viewport width
+     even before/without JS; fitStackToViewport() then refines it further to
+     also account for height. */
+  .stack { position: relative; width: 1100px; transform-origin: top center; transform: scale(min(1, calc((100vw - 40px) / 1100px))); }
   .page {
     position: relative;
     z-index: 10;
