@@ -98,11 +98,7 @@
   .signature-input { font-family: 'Dancing Script', cursive; font-size: 1.8em; border: none; outline: none; width: 100%; background: transparent; }
   .signature-caption { font-size: 12px; margin-top: 4px; color: #333; }
 
-  #mobileFlipNav { display: none; justify-content: center; align-items: center; margin: 0 auto 16px auto; }
-  #mobilePageLabel { color: white; font-family: 'Exo 2', sans-serif; font-size: 13px; text-align: center; opacity: 0.8; }
-
   @media (max-width: 700px) {
-    #mobileFlipNav { display: flex; }
     #stackWrapper { overflow-x: hidden; max-width: 100vw; }
     .stack .bg-paper, .stack > .page {
       position: absolute;
@@ -117,12 +113,12 @@
     }
     .stack .bg-paper.mobile-peek-1, .stack > .page.mobile-peek-1 {
       z-index: 20;
-      transform: translateY(60px) rotate(-3deg);
+      transform: translate(-70px, 60px) rotate(-4deg);
       cursor: pointer;
     }
     .stack .bg-paper.mobile-peek-2, .stack > .page.mobile-peek-2 {
       z-index: 10;
-      transform: translateY(105px) rotate(3deg);
+      transform: translate(70px, 105px) rotate(4deg);
       cursor: pointer;
     }
   }
@@ -289,10 +285,6 @@
 </div>
 
 </div>
-</div>
-
-<div id="mobileFlipNav">
-  <span id="mobilePageLabel"></span>
 </div>
 
 <script>
@@ -1097,8 +1089,6 @@ document.querySelectorAll('.bg-paper').forEach(function (el) {
     order.forEach(function (pageIdx, stackPos) {
       mobilePages[pageIdx].el.classList.add(peekClasses[stackPos]);
     });
-    document.getElementById('mobilePageLabel').textContent =
-      mobilePages[order[0]].label + ' (1/' + mobilePages.length + ')';
     setTimeout(fitStackToViewport, 320);
   }
 
