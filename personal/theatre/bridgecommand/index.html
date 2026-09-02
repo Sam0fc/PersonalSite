@@ -288,6 +288,20 @@
 </div>
 
 <script>
+// the CSV holds real-world dates; everything shown to the user is shifted
+// this many years into the future to match the in-universe setting
+const YEAR_OFFSET = 156;
+
+// takes an ISO 'YYYY-MM-DD' string (or a Date), returns an ISO string with
+// YEAR_OFFSET added — for display/export only, never used for date math
+function shiftDate(dateStrOrDate) {
+  const d = (dateStrOrDate instanceof Date) ? dateStrOrDate : new Date(dateStrOrDate);
+  const yyyy = d.getUTCFullYear() + YEAR_OFFSET;
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return yyyy + '-' + mm + '-' + dd;
+}
+
 function parseCSV(text) {
   // strip BOM
   text = text.replace(/^﻿/, '');
@@ -417,7 +431,7 @@ function toCSV(rows) {
   const headers = ['Date', 'Ship', 'Category', 'Mission'];
   const lines = [headers.map(csvField).join(',')];
   rows.forEach(r => {
-    lines.push(headers.map(h => csvField(r[h])).join(','));
+    lines.push(headers.map(h => csvField(h === 'Date' ? shiftDate(r[h]) : r[h])).join(','));
   });
   return lines.join('\r\n');
 }
@@ -442,7 +456,7 @@ const CATEGORY_COLORS = {
 function render(rows) {
   const dated = rows.filter(r => r.Date).sort((a, b) => a.Date < b.Date ? -1 : a.Date > b.Date ? 1 : 0);
 
-  document.getElementById('info').textContent = dated.length + ' missions recorded, from ' + dated[0].Date + ' to ' + dated[dated.length - 1].Date;
+  document.getElementById('info').textContent = dated.length + ' missions recorded, from ' + shiftDate(dated[0].Date) + ' to ' + shiftDate(dated[dated.length - 1].Date);
 
   // one point per mission, y = running cumulative count
   const points = dated.map((r, i) => ({
@@ -478,7 +492,7 @@ function renderRecentMissions(points) {
     const dateSpan = document.createElement('div');
     dateSpan.style.opacity = '0.75';
     dateSpan.style.fontSize = '0.8em';
-    dateSpan.textContent = p.date + ' — ' + p.ship;
+    dateSpan.textContent = shiftDate(p.date) + ' — ' + p.ship;
     const missionSpan = document.createElement('div');
     missionSpan.style.fontWeight = 'bold';
     missionSpan.textContent = p.mission;
@@ -607,7 +621,7 @@ function renderCsvTable(rows) {
     const tr = document.createElement('tr');
     ['Date', 'Ship', 'Category', 'Mission'].forEach(key => {
       const td = document.createElement('td');
-      td.textContent = r[key] || '';
+      td.textContent = key === 'Date' ? shiftDate(r[key]) : (r[key] || '');
       td.style.borderBottom = '1px solid #ddd';
       td.style.padding = '3px 6px';
       tr.appendChild(td);
@@ -761,7 +775,7 @@ function drawChart(points) {
     label.setAttribute('font-size', '15');
     label.setAttribute('text-anchor', 'end');
     label.setAttribute('transform', 'rotate(-45 ' + xx + ' ' + (margin.top + plotH + 5) + ')');
-    label.textContent = new Date(t).toISOString().slice(0, 10);
+    label.textContent = shiftDate(new Date(t));
     svg.appendChild(label);
   }
 
@@ -822,7 +836,7 @@ function drawChart(points) {
     hit.setAttribute('fill', 'transparent');
     g.appendChild(hit);
 
-    const tooltipText = p.mission + '\n' + p.date + '\n' + p.ship + ' — ' + p.category + '\nCumulative: ' + p.cumulative;
+    const tooltipText = p.mission + '\n' + shiftDate(p.date) + '\n' + p.ship + ' — ' + p.category + '\nCumulative: ' + p.cumulative;
     g.addEventListener('mouseenter', evt => showTooltip(evt, tooltipText));
     g.addEventListener('mousemove', evt => moveTooltip(evt));
     g.addEventListener('mouseleave', hideTooltip);
@@ -1143,8 +1157,12 @@ window.addEventListener('resize', fitStackToViewport);
 window.addEventListener('load', fitStackToViewport);
 setTimeout(fitStackToViewport, 0);
 
-document.getElementById('reviewLine').textContent =
-  'This officer passed review on ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + ', signed:';
+(function () {
+  const today = new Date();
+  today.setUTCFullYear(today.getUTCFullYear() + YEAR_OFFSET);
+  document.getElementById('reviewLine').textContent =
+    'This officer passed review on ' + today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) + ', signed:';
+})();
 </script>
 </body>
 </html>
