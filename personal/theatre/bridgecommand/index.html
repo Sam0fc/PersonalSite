@@ -1117,16 +1117,32 @@ document.querySelectorAll('.bg-paper').forEach(function (el) {
 
   // swipe up/down to switch page on touch devices
   let touchStartY = null;
+  let touchStartX = null;
   window.addEventListener('touchstart', function (e) {
-    if (isMobile()) touchStartY = e.touches[0].clientY;
+    if (isMobile()) {
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+    }
   }, { passive: true });
   window.addEventListener('touchend', function (e) {
     if (!isMobile() || touchStartY === null) return;
     const dy = touchStartY - e.changedTouches[0].clientY;
+    const dx = touchStartX - e.changedTouches[0].clientX;
     touchStartY = null;
-    if (Math.abs(dy) < 50) return;
-    if (dy > 0) next(); else prev();
-  }, { passive: true });
+    touchStartX = null;
+
+    // a real swipe (finger moved) still switches pages
+    if (Math.abs(dy) >= 50 || Math.abs(dx) >= 50) {
+      if (Math.abs(dy) > Math.abs(dx)) { if (dy > 0) next(); else prev(); }
+      else { if (dx > 0) next(); else prev(); }
+      return;
+    }
+
+    // otherwise treat it as a tap: tapping the paper background flips forward,
+    // but not if the tap landed on an interactive element (form, button, link, etc.)
+    const interactive = e.target.closest('input, select, button, textarea, a, label, .marker, .status-btn');
+    if (!interactive) next();
+  });
 })();
 
 // zoom the whole stack out so its top and bottom always fit in the viewport
