@@ -113,12 +113,12 @@
     }
     .stack .bg-paper.mobile-peek-1, .stack > .page.mobile-peek-1 {
       z-index: 20;
-      transform: translate(-70px, 60px) rotate(-4deg);
+      transform: translate(-70px, 260px) rotate(-4deg);
       cursor: pointer;
     }
     .stack .bg-paper.mobile-peek-2, .stack > .page.mobile-peek-2 {
       z-index: 10;
-      transform: translate(70px, 105px) rotate(4deg);
+      transform: translate(70px, 460px) rotate(4deg);
       cursor: pointer;
     }
   }
@@ -1116,7 +1116,7 @@ const STACK_DESIGN_WIDTH = 1100; // must match the fixed width in the .stack CSS
 
 // how far (in unscaled design px) the furthest peeking paper sticks out below
 // the front page on mobile — must match the .mobile-peek-2 translateY value
-const MOBILE_PEEK_EXTRA = 105;
+const MOBILE_PEEK_EXTRA = 460;
 
 function fitStackToViewport() {
   const wrapper = document.getElementById('stackWrapper');
