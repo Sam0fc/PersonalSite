@@ -1124,11 +1124,17 @@ document.querySelectorAll('.bg-paper').forEach(function (el) {
 // zoom the whole stack out so its top and bottom always fit in the viewport
 const STACK_DESIGN_WIDTH = 1100; // must match the fixed width in the .stack CSS rule
 
+// how far (in unscaled design px) the furthest peeking paper sticks out below
+// the front page on mobile — must match the .mobile-peek-2 translateY value
+const MOBILE_PEEK_EXTRA = 105;
+
 function fitStackToViewport() {
   const wrapper = document.getElementById('stackWrapper');
   const stack = document.querySelector('.stack');
   stack.style.transform = 'none';
-  const naturalHeight = stack.getBoundingClientRect().height;
+  let naturalHeight = stack.getBoundingClientRect().height;
+  const isMobileFlip = window.matchMedia('(max-width: 700px)').matches;
+  if (isMobileFlip) naturalHeight += MOBILE_PEEK_EXTRA;
   const availableHeight = window.innerHeight - 80;
   const availableWidth = window.innerWidth - 40;
   // scale to fit both dimensions — the whole "poster" shrinks as one unit,
