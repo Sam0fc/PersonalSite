@@ -13,7 +13,8 @@
     font-family: 'Exo 2', sans-serif;
     min-height: 100vh;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
     background-color: #05070d;
     background-image:
       radial-gradient(1px 1px at 20px 30px, white, transparent),
@@ -27,7 +28,9 @@
     overflow-x: hidden;
   }
   #stackWrapper { width: 100%; max-width: 1100px; margin: 40px auto; overflow: visible; }
-  .stack { position: relative; width: 100%; transform-origin: top center; }
+  /* fixed "poster" width — always laid out at full desktop size, then scaled
+     as a whole (never reflowed) to fit the viewport, so text never crushes */
+  .stack { position: relative; width: 1100px; transform-origin: top center; }
   .page {
     position: relative;
     z-index: 10;
@@ -117,9 +120,6 @@
 </head>
 <body>
 <div id="tooltip" style="position:absolute; display:none; background:white; border:1px solid black; padding:8px 12px; font-size:13px; pointer-events:none; z-index:1000;"></div>
-<div id="mobileFlipNav">
-  <span id="mobilePageLabel"></span>
-</div>
 <div id="stackWrapper">
 <div class="stack">
 
@@ -279,6 +279,10 @@
 </div>
 
 </div>
+</div>
+
+<div id="mobileFlipNav">
+  <span id="mobilePageLabel"></span>
 </div>
 
 <script>
@@ -1154,10 +1158,15 @@ function fitStackToViewport() {
   const stack = document.querySelector('.stack');
   stack.style.transform = 'none';
   const naturalHeight = stack.getBoundingClientRect().height;
-  const available = window.innerHeight - 80;
-  const scale = Math.min(1, available / naturalHeight) * 0.94; // a bit more headroom
+  const naturalWidth = stack.getBoundingClientRect().width;
+  const availableHeight = window.innerHeight - 80;
+  const availableWidth = window.innerWidth - 40;
+  // scale to fit both dimensions — the whole "poster" shrinks as one unit,
+  // it never reflows/crushes its (fixed-width) internal layout
+  const scale = Math.min(1, availableHeight / naturalHeight, availableWidth / naturalWidth) * 0.94;
   stack.style.transform = 'scale(' + scale + ')';
   wrapper.style.height = (naturalHeight * scale) + 'px';
+  wrapper.style.width = (naturalWidth * scale) + 'px';
 }
 window.addEventListener('resize', fitStackToViewport);
 window.addEventListener('load', fitStackToViewport);
