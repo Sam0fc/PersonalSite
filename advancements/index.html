@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sam's Achievements</title>
+<meta name="description" content="Personal goals, laid out as an old-school Minecraft achievement map.">
+<style>
+/* Everything is drawn at GUI scale 2: one texture pixel = 2 CSS pixels. Textures come from the Minecraft 1.8.9 and 1.12.2 client jars. */
+:root { --ground: #1e1a17; color-scheme: dark; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; }
+body {
+  background-color: var(--ground);
+  /* the old options screen: dirt at 25% brightness */
+  background-image: linear-gradient(rgba(0,0,0,.75), rgba(0,0,0,.75)), url(textures/gui/options_background.png);
+  background-size: auto, 64px 64px;
+  image-rendering: pixelated;
+  display: grid; place-items: center;
+  padding-block: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  overflow: hidden;
+}
+img, canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+canvas.bm { display: block; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.window {
+  position: relative;
+  width: min(100%, 1280px);
+  height: min(100%, 860px);
+  min-height: 360px;
+}
+.window .frame {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  border-style: solid; border-width: 48px 46px 80px 46px;
+  border-image: url(textures/gui/window.png) 24 23 40 23 fill stretch;
+}
+.window .title { position: absolute; z-index: 3; left: 30px; top: 10px; }
+.viewport {
+  position: absolute; z-index: 1; top: 34px; left: 32px; right: 32px; bottom: 64px;
+  overflow: hidden; background: #000;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.viewport.dragging { cursor: grabbing; }
+.map { position: absolute; left: 0; top: 0; will-change: transform; }
+.map > canvas { position: absolute; left: 0; top: 0; }
+
+.node {
+  position: absolute; z-index: 2; width: 52px; height: 52px; padding: 0; border: 0; background: none; cursor: pointer;
+}
+.node .fr { position: absolute; inset: 0; background: 0 0 / 52px 52px no-repeat; }
+.node img { position: absolute; left: 10px; top: 10px; width: 32px; height: 32px; pointer-events: none; }
+.node.done .fr { filter: brightness(.75); }
+.node.locked .fr { filter: brightness(.3); }
+.node.locked img { filter: brightness(.1); }
+.node.open .fr { animation: blink .6s steps(1, end) infinite; }
+@keyframes blink { 0% { filter: brightness(.8); } 30% { filter: brightness(1); } 50% { filter: brightness(.8); } }
+.node:focus-visible { outline: 2px dashed #fff; outline-offset: 2px; }
+
+.tip {
+  position: absolute; z-index: 5; pointer-events: none;
+  background: rgba(0, 0, 0, .753); padding: 6px;
+}
+.tip canvas { margin-bottom: 0; }
+
+@media (prefers-reduced-motion: reduce) { .node.open .fr { animation: none; } }
+</style>
+</head>
+<body>
+<h1 class="sr">Sam's Achievements</h1>
+<section class="window" id="window" aria-label="Achievements">
+  <div class="viewport" id="viewport"><div class="map" id="map"></div></div>
+  <div class="frame"></div>
+  <div class="title" id="winTitle"></div>
+  <div class="tip" id="tip" hidden></div>
+</section>
+
+<script>
+/* =====================================================================
+   GOALS: edit this list. Each category is one tree on the map.
+   Each node:
+     title, desc
+     icon: an item texture name from textures/item/ (e.g. "book_normal")
+     type: "task" (plain frame, default) | "goal" or "challenge" (spiky frame)
+     done: true when achieved
+     secret: true to keep it off the map until it's done
+     progress: [current, target] (optional)
+     children: [...more nodes]
+   A goal is "open" (blinking) when its parent is done, and dark until then.
+   The font only has plain ASCII (plus £), so stick to those characters.
+   ===================================================================== */
+const CATEGORIES = [
+  { name: "Academia", root:
+    { title: "Matriculation", desc: "Start a degree at university", icon: "book_normal", done: true, children: [
+      { title: "Graduate", desc: "Finish your undergraduate degree", icon: "book_writable", done: true, children: [
+        { title: "Master of Science", desc: "Finish your master's", icon: "knowledge_book", type: "goal", done: true, children: [
+          { title: "First Class", desc: "Get a First in your master's", icon: "nether_star", type: "challenge", secret: true, done: true },
+          { title: "Applications In", desc: "Apply for PhD programmes", icon: "paper", children: [
+            { title: "Offer Letter", desc: "Get a PhD offer", icon: "book_written", type: "goal", children: [
+              { title: "Peer Reviewed", desc: "Publish a first-author paper", icon: "sign" },
+              { title: "Call Me Doctor", desc: "Be awarded a PhD", icon: "book_enchanted", type: "challenge" } ] } ] } ] } ] } ] } },
+
+  { name: "Scuba", root:
+    { title: "Breathe Easy", desc: "Earn your PADI Open Water Diver certification", icon: "bucket_water", done: true, children: [
+      { title: "Deeper", desc: "Earn PADI Advanced Open Water", icon: "prismarine_crystals", done: true, children: [
+        { title: "Wreck Diver", desc: "Earn the Wreck Diver specialty", icon: "oak_boat" },
+        { title: "Rescue Diver", desc: "Complete the Rescue Diver course", icon: "totem", type: "goal" },
+        { title: "Cave Diver", desc: "Train to dive in caves", icon: "prismarine_shard", type: "challenge" } ] },
+      { title: "Dry Suit", desc: "Earn the Dry Suit Diver specialty", icon: "leather", done: true },
+      { title: "Enriched Air", desc: "Earn the Enriched Air Nitrox specialty", icon: "dragon_breath", done: true } ] } },
+
+  { name: "Piloting", root:
+    { title: "Trial Lesson", desc: "Take the controls on a trial flying lesson", icon: "feather", children: [
+      { title: "Ground School", desc: "Pass all nine PPL theory exams", icon: "book_normal", progress: [0, 9] },
+      { title: "Class 2", desc: "Pass a Class 2 aviation medical", icon: "apple_golden" },
+      { title: "First Solo", desc: "Fly the circuit alone", icon: "elytra", type: "goal", children: [
+        { title: "Cross-Country", desc: "Fly a solo qualifying cross-country", icon: "compass_00", children: [
+          { title: "Licensed to Fly", desc: "Earn your Private Pilot Licence", icon: "fireworks", type: "challenge" } ] } ] } ] } },
+
+  { name: "Caving", root:
+    { title: "Into the Dark", desc: "Join a caving club", icon: "torch_on", done: true, children: [
+      { title: "Agen Allwedd", desc: "Go caving in Aggy", icon: "coal", done: true },
+      { title: "Craig a Ffynnon", desc: "Go caving in Craig a Ffynnon", icon: "flint", done: true },
+      { title: "Ogof Ffynnon Ddu", desc: "Go caving in OFD", icon: "iron_nugget", done: true },
+      { title: "On Rope", desc: "Learn single rope technique (SRT)", icon: "lead", done: true, children: [
+        { title: "Rope Underground", desc: "Use SRT on a real cave pitch", icon: "string", children: [
+          { title: "Big Pitch", desc: "Abseil a 50 m pitch", icon: "feather", type: "goal" } ] } ] },
+      { title: "Surveyor", desc: "Survey new passage", icon: "map_empty", type: "goal", children: [
+        { title: "Trip Leader", desc: "Lead a trip underground", icon: "diamond", type: "challenge" } ] } ] } },
+
+  { name: "MCSR", root:
+    { title: "Ranked", desc: "Play MCSR Ranked", icon: "ender_eye", children: [
+      { title: "The End?", desc: "Finish a run", icon: "end_crystal", children: [
+        { title: "Sub 30", desc: "Finish a run in under 30 minutes", icon: "clock_00", type: "goal", children: [
+          { title: "Sub 20", desc: "Finish a run in under 20 minutes", icon: "sugar", type: "challenge" } ] } ] },
+      { title: "Placements", desc: "Finish your Ranked placement matches", icon: "name_tag", children: [
+        { title: "Elo Climber", desc: "Reach your target Elo", icon: "emerald", type: "goal" } ] } ] } },
+
+  { name: "Software", root:
+    { title: "Hello, World", desc: "Write your first program", icon: "redstone_dust", done: true, children: [
+      { title: "Self Hosted", desc: "Run your own server at home", icon: "comparator", done: true, children: [
+        { title: "Five Nines", desc: "Keep a service up for a whole year", icon: "clock_00", type: "challenge" } ] },
+      { title: "It's For You", desc: "Build software that someone else uses", icon: "cake", done: true },
+      { title: "Open Source", desc: "Publish an open-source project", icon: "book_writable", children: [
+        { title: "First Contributor", desc: "Merge a pull request from someone else", icon: "emerald", children: [
+          { title: "Maintainer", desc: "Maintain an open-source project with many users", icon: "diamond", type: "challenge" } ] } ] },
+      { title: "Upstream", desc: "Get a pull request merged into someone else's open-source project", icon: "repeater" } ] } },
+
+  { name: "Travel", root:
+    { title: "Passport Stamp", desc: "Travel abroad", icon: "map_empty", done: true, children: [
+      { title: "Ten Countries", desc: "Visit 10 countries", icon: "compass_00", done: true, children: [
+        { title: "Thirty Countries", desc: "Visit 30 countries", icon: "map_filled", done: true, children: [
+          { title: "Fifty Countries", desc: "Visit 50 countries", icon: "oak_boat", type: "goal", progress: [39, 50], children: [
+            { title: "Hundred Club", desc: "Visit 100 countries", icon: "fireworks", type: "challenge", progress: [39, 100] } ] } ] } ] },
+      { title: "Seven Continents", desc: "Set foot on every continent", icon: "elytra", type: "challenge", progress: [4, 7] } ] } },
+
+  { name: "Motorcycle", root:
+    { title: "Saving Up", desc: "Save for a Maeving RM2", icon: "gold_nugget", children: [
+      { title: "Keys in Hand", desc: "Buy your Maeving RM2", icon: "saddle", type: "goal", children: [
+        { title: "CBT", desc: "Pass Compulsory Basic Training", icon: "iron_helmet", children: [
+          { title: "Full Licence", desc: "Pass your full motorcycle licence", icon: "name_tag", type: "goal" } ] },
+        { title: "High Mileage", desc: "Ride 1,000 miles on your own bike", icon: "minecart_normal" } ] } ] } },
+];
+
+/* ---------------- helpers ---------------- */
+const U = 2;                       // CSS pixels per GUI pixel
+const CELL = 24;                   // the old achievement grid, in GUI pixels
+const item = n => `textures/item/${n}.png`;
+const loadImage = src => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = src; });
+const $ = id => document.getElementById(id);
+const shown = n => !n.secret || n.done;  // secret achievements stay off the map until they're taken
+const kids = n => (n.children || []).filter(shown);
+const flatten = (n, out = []) => { out.push(n); kids(n).forEach(c => flatten(c, out)); return out; };
+const special = n => n.type === "goal" || n.type === "challenge";
+
+/* ---------------- bitmap font (1.8.9 textures/font/ascii.png) ---------------- */
+const FONT = { sheet: null, adv: new Array(256).fill(6), tints: new Map() };
+function initFont(img) {
+  FONT.sheet = img;
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, 128, 128).data;
+  for (let code = 0; code < 256; code++) {
+    const cx = (code % 16) * 8, cy = (code >> 4) * 8;
+    let w = 0;
+    for (let x = 7; x >= 0 && !w; x--) for (let y = 0; y < 8; y++) if (d[((cy + y) * 128 + cx + x) * 4 + 3]) { w = x + 1; break; }
+    FONT.adv[code] = w + 1;
+  }
+  FONT.adv[32] = 4;
+}
+const glyph = ch => { const c = ch.charCodeAt(0); return c >= 32 && c < 127 ? c : ch === "£" ? 156 : 63; };
+const textWidth = s => [...s].reduce((w, ch) => w + FONT.adv[glyph(ch)], 0) - 1;
+function tint(color) {
+  if (!FONT.tints.has(color)) {
+    const c = document.createElement("canvas"); c.width = c.height = 128;
+    const g = c.getContext("2d"); g.drawImage(FONT.sheet, 0, 0);
+    g.globalCompositeOperation = "source-in"; g.fillStyle = color; g.fillRect(0, 0, 128, 128);
+    FONT.tints.set(color, c);
+  }
+  return FONT.tints.get(color);
+}
+const shadowOf = hex => { const n = parseInt(hex.slice(1), 16), s = (n & 0xFCFCFC) >> 2; return "#" + s.toString(16).padStart(6, "0"); };
+function drawString(g, s, x, y, color) {
+  const sheet = tint(color);
+  for (const ch of s) { const i = glyph(ch); g.drawImage(sheet, (i % 16) * 8, (i >> 4) * 8, 8, 8, x, y, 8, 8); x += FONT.adv[i]; }
+}
+/* lines: [[text, color, gapBefore?], ...] -> canvas in GUI pixels, displayed at U */
+function textCanvas(lines, { shadow = true } = {}) {
+  if (!Array.isArray(lines)) lines = [[lines, "#ffffff"]];
+  let y = 0; const rows = lines.map(([s, col, gap = 0]) => { y += gap; const r = { s, col, y }; y += 9; return r; });
+  const w = Math.max(1, ...rows.map(r => textWidth(r.s))) + 2;
+  const c = document.createElement("canvas"); c.className = "bm"; c.width = w; c.height = y;
+  c.style.width = w * U + "px"; c.style.height = y * U + "px";
+  const g = c.getContext("2d");
+  rows.forEach(r => { if (shadow) drawString(g, r.s, 1, r.y + 1, shadowOf(r.col)); drawString(g, r.s, 0, r.y, r.col); });
+  c.setAttribute("aria-hidden", "true");
+  return c;
+}
+function wrap(s, max) {
+  const out = []; let line = "";
+  for (const word of s.split(" ")) {
+    const next = line ? line + " " + word : word;
+    if (line && textWidth(next) > max) { out.push(line); line = word; } else line = next;
+  }
+  if (line) out.push(line);
+  return out;
+}
+/* colours straight from the old GuiAchievements */
+const C = { title: "#ffffff", titleSpecial: "#ffff80", titleLocked: "#808080", titleLockedSpecial: "#808040",
+  desc: "#a0a0a0", taken: "#9090ff", secret: "#ff55ff", requires: "#705050", window: "#404040",
+  lineDone: "#a0a0a0", lineOpen: "#00ff00", lineLocked: "#000000" };
+
+/* ---------------- layout: every tree on one map, in grid cells ---------------- */
+function layoutTree(root) {
+  let row = 0;
+  (function walk(n, depth, parent) {
+    n.parent = parent; n.depth = depth;
+    const ks = kids(n);
+    ks.forEach(k => walk(k, depth + 1, n));
+    n.row = ks.length ? (ks[0].row + ks[ks.length - 1].row) / 2 : row++;
+  })(root, 0, null);
+  const nodes = flatten(root);
+  nodes.forEach(n => { n.cx = n.depth * 2; n.cy = n.row * 1.5; });
+  return { nodes, w: Math.max(...nodes.map(n => n.cx)) + 1, h: Math.max(...nodes.map(n => n.cy)) + 1 };
+}
+function layoutMap() {
+  const trees = CATEGORIES.map(c => layoutTree(c.root));
+  const COLS = 3, GAP = 2;
+  const colW = [], rowH = [];
+  trees.forEach((t, i) => {
+    const c = i % COLS, r = Math.floor(i / COLS);
+    colW[c] = Math.max(colW[c] || 0, t.w); rowH[r] = Math.max(rowH[r] || 0, t.h);
+  });
+  const all = [];
+  trees.forEach((t, i) => {
+    const c = i % COLS, r = Math.floor(i / COLS);
+    const ox = colW.slice(0, c).reduce((a, b) => a + b + GAP, 0);
+    const oy = rowH.slice(0, r).reduce((a, b) => a + b + GAP, 0) + (rowH[r] - t.h) / 2;
+    t.nodes.forEach(n => { n.x = Math.round((ox + n.cx) * CELL); n.y = Math.round((oy + n.cy) * CELL); all.push(n); });
+  });
+  all.forEach(n => {
+    n.state = n.done ? "done" : (!n.parent || n.parent.done) ? "open" : "locked";
+  });
+  const w = Math.max(...all.map(n => n.x)) + 26, h = Math.max(...all.map(n => n.y)) + 26;
+  return { nodes: all, w, h };
+}
+
+/* ---------------- map rendering ---------------- */
+const vp = $("viewport"), mapEl = $("map"), tip = $("tip"), win = $("window");
+const PAD = 3 * CELL;              // terrain beyond the outermost achievements
+let MAP, IMG = {}, pan = { x: 0, y: 0 }, mapSize = { w: 0, h: 0 }, terrainCanvas, pinned = null;
+let drag = null, moved = false;
+
+function rng(seed) {
+  return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+/* The old screen's random underground: sand at the top, stone and ores lower, bedrock at the bottom, darker with depth. */
+function drawTerrain(w, h) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.style.width = w * U + "px"; c.style.height = h * U + "px";
+  const g = c.getContext("2d");
+  const rows = Math.ceil(h / 16), cols = Math.ceil(w / 16);
+  const depthScale = Math.max(1, rows / 34);  // keep bedrock for the last row or two however tall the map is
+  for (let r = 0; r < rows; r++) {
+    const d = Math.floor(r / depthScale);
+    const f = Math.max(0.12, 0.6 - d / 25 * 0.3);
+    for (let col = 0; col < cols; col++) {
+      const R = rng(r * 7919 + col * 104729 + 1337);
+      const j = Math.floor(R() * (1 + d)) + Math.floor(d / 2);
+      let b = "sand";
+      if (j <= 37 && r < rows - 1) {
+        if (j === 22) b = R() < .5 ? "diamond_ore" : "redstone_ore";
+        else if (j === 10) b = "iron_ore";
+        else if (j === 12) b = "coal_ore";
+        else if (j > 4) b = "stone";
+        else if (j > 0) b = "dirt";
+      } else b = "bedrock";
+      g.drawImage(IMG[b], col * 16, r * 16);
+      g.fillStyle = `rgba(0,0,0,${1 - f})`; g.fillRect(col * 16, r * 16, 16, 16);
+    }
+  }
+  return c;
+}
+function tintedArrow(color) {
+  const a = IMG.arrow, c = document.createElement("canvas"); c.width = a.width; c.height = a.height;
+  const g = c.getContext("2d");
+  g.drawImage(a, 0, 0);
+  g.globalCompositeOperation = "multiply"; g.fillStyle = color; g.fillRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = "destination-in"; g.drawImage(a, 0, 0);
+  return c;
+}
+function drawLines(w, h, ox, oy) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.style.width = w * U + "px"; c.style.height = h * U + "px";
+  const g = c.getContext("2d");
+  const colorOf = n => n.state === "done" ? C.lineDone : n.state === "open" ? C.lineOpen : C.lineLocked;
+  const arrows = {};
+  const order = { locked: 0, open: 1, done: 2 };
+  MAP.nodes.filter(n => n.parent).sort((a, b) => order[a.state] - order[b.state]).forEach(n => {
+    const col = colorOf(n);
+    const k5 = ox + n.x + 13, l5 = oy + n.y + 13, j6 = ox + n.parent.x + 13, k6 = oy + n.parent.y + 13;
+    g.fillStyle = col;
+    g.fillRect(Math.min(k5, j6), l5, Math.abs(k5 - j6) + 1, 1);     // along the child's row
+    g.fillRect(j6, Math.min(l5, k6), 1, Math.abs(l5 - k6) + 1);     // down the parent's column
+    arrows[col] = arrows[col] || tintedArrow(col);
+    g.drawImage(arrows[col], k5 - 11 - 7, l5 - 5);
+  });
+  return c;
+}
+
+function build() {
+  MAP = layoutMap();
+  const vw = Math.ceil(vp.clientWidth / U), vh = Math.ceil(vp.clientHeight / U);
+  const w = Math.max(MAP.w + 2 * PAD, vw), h = Math.max(MAP.h + 2 * PAD, vh);
+  const ox = Math.round((w - MAP.w) / 2), oy = Math.round((h - MAP.h) / 2);
+  mapSize = { w: w * U, h: h * U, ox, oy };
+
+  mapEl.innerHTML = "";
+  mapEl.style.width = w * U + "px"; mapEl.style.height = h * U + "px";
+  mapEl.append(drawTerrain(w, h), drawLines(w, h, ox, oy));
+
+  MAP.nodes.forEach(n => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "node " + n.state;
+    b.style.left = (ox + n.x) * U + "px"; b.style.top = (oy + n.y) * U + "px";
+    b.innerHTML = `<span class="fr" style="background-image:url(textures/gui/${special(n) ? "frame_special" : "frame"}.png)"></span><img alt="" src="${item(n.icon)}">`;
+    b.setAttribute("aria-label", `${n.title}. ${n.desc}${n.done ? ". Taken" : n.state === "locked" ? `. Requires ${n.parent.title}` : ""}`);
+    n.el = b;
+    b.addEventListener("pointermove", e => { if (e.pointerType === "mouse" && !drag) showTip(n, e.clientX, e.clientY); });
+    b.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") pinned ? showTip(pinned) : hideTip(); });
+    b.addEventListener("focus", () => showTip(n));
+    b.addEventListener("blur", () => { if (pinned !== n) hideTip(); });
+    b.addEventListener("click", e => {
+      e.stopPropagation();
+      if (moved) { moved = false; return; }
+      pinned = pinned === n ? null : n;
+      pinned ? showTip(n) : hideTip();
+    });
+    mapEl.appendChild(b);
+  });
+}
+
+function clampPan() {
+  const vw = vp.clientWidth, vh = vp.clientHeight;
+  pan.x = Math.min(0, Math.max(vw - mapSize.w, pan.x));
+  pan.y = Math.min(0, Math.max(vh - mapSize.h, pan.y));
+  pan.x = Math.round(pan.x / U) * U; pan.y = Math.round(pan.y / U) * U;
+  mapEl.style.transform = `translate(${pan.x}px, ${pan.y}px)`;
+}
+function startPan() {
+  // open on the first tree, the way the old screen opened on Taking Inventory
+  const first = MAP.nodes[0];
+  pan = { x: -((mapSize.ox + first.x - 2 * CELL) * U), y: -((mapSize.oy + first.y - 3 * CELL) * U) };
+  clampPan();
+}
+
+/* ---------------- tooltip ---------------- */
+function showTip(n, clientX, clientY) {
+  const titleColor = n.state === "locked" ? (special(n) ? C.titleLockedSpecial : C.titleLocked) : (special(n) ? C.titleSpecial : C.title);
+  const width = Math.max(textWidth(n.title), 120);
+  const lines = [[n.title, titleColor]];
+  wrap(n.desc, width).forEach((s, i) => lines.push([s, C.desc, i === 0 ? 3 : 0]));
+  if (n.progress) lines.push([`${n.progress[0]}/${n.progress[1]}`, C.desc]);
+  if (n.state === "locked") wrap(`Requires '${n.parent.title}'`, width).forEach((s, i) => lines.push([s, C.requires, i === 0 ? 3 : 0]));
+  if (n.secret) lines.push(["Secret Achievement", C.secret, 3]);
+  if (n.done) lines.push(["Taken!", C.taken, n.secret ? 0 : 3]);
+  tip.innerHTML = ""; tip.appendChild(textCanvas(lines));
+  tip.style.width = (width + 6) * U + "px";
+  tip.hidden = false;
+
+  const wr = win.getBoundingClientRect();
+  let x, y;
+  if (clientX === undefined) {
+    const r = n.el.getBoundingClientRect();
+    x = r.left + r.width / 2 - wr.left + 12 * U; y = r.top + r.height / 2 - wr.top - 4 * U;
+  } else { x = clientX - wr.left + 12 * U; y = clientY - wr.top - 4 * U; }
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  if (x + tw > wr.width) x = Math.max(0, x - tw - 24 * U);
+  y = Math.min(Math.max(0, y - 6), wr.height - th);
+  tip.style.left = Math.round(x / U) * U - 6 + "px"; tip.style.top = Math.round(y / U) * U + "px";
+}
+function hideTip() { tip.hidden = true; }
+
+function bindDrag() {
+  vp.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    drag = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }; moved = false;
+  });
+  window.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!moved && Math.hypot(dx, dy) < 5) return;
+    moved = true; vp.classList.add("dragging");
+    pan.x = drag.px + dx; pan.y = drag.py + dy; clampPan(); hideTip(); pinned = null;
+  });
+  const end = () => { drag = null; vp.classList.remove("dragging"); };
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", end);
+  vp.addEventListener("click", () => { if (moved) { moved = false; return; } pinned = null; hideTip(); });
+  let t;
+  window.addEventListener("resize", () => {
+    clearTimeout(t);
+    t = setTimeout(() => { const keep = { ...pan }; build(); pan = keep; clampPan(); }, 150);
+    hideTip(); pinned = null;
+  });
+}
+
+const BLOCKS = ["sand", "dirt", "stone", "coal_ore", "iron_ore", "redstone_ore", "diamond_ore", "bedrock"];
+Promise.all([
+  loadImage("textures/gui/ascii.png"),
+  loadImage("textures/gui/arrow.png"),
+  ...BLOCKS.map(b => loadImage(`textures/block/${b}.png`)),
+]).then(([font, arrow, ...blocks]) => {
+  initFont(font);
+  IMG.arrow = arrow; BLOCKS.forEach((b, i) => IMG[b] = blocks[i]);
+  $("winTitle").appendChild(textCanvas([["Achievements", C.window]], { shadow: false }));
+  build(); startPan(); bindDrag();
+});
+</script>
+</body>
+</html>
