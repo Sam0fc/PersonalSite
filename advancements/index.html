@@ -119,7 +119,8 @@ const ROOT =
       { title: "Open Source", desc: "Publish an open-source package (coreclean)", icon: "minecart_chest", done: true, children: [
         { title: "First Contributor", desc: "Merge a pull request from someone else", icon: "emerald", children: [
           { title: "Maintainer", desc: "Maintain an open-source project with many users", icon: "diamond", type: "challenge" } ] } ] },
-      { title: "Upstream", desc: "Get a pull request merged into someone else's open-source project", icon: "repeater" } ] },
+      { title: "Team Player", desc: "Contribute to a friend's project", icon: "repeater", done: true, children: [
+        { title: "Upstream", desc: "Get a pull request merged into a public open-source project", icon: "hopper" } ] } ] },
 
     /* ---- hobbies ---- */
     { title: "Side Quests", desc: "Find something to do outside work", icon: "fishing_rod_uncast", done: true, children: [
@@ -155,7 +156,18 @@ const ROOT =
         { title: "Keys in Hand", desc: "Buy your Maeving RM2", icon: "saddle", type: "goal", children: [
           { title: "CBT", desc: "Pass Compulsory Basic Training", icon: "iron_helmet", children: [
             { title: "Full Licence", desc: "Pass your full motorcycle licence", icon: "name_tag", type: "goal" } ] },
-          { title: "High Mileage", desc: "Ride 1,000 miles on your own bike", icon: "minecart_normal" } ] } ] } ] },
+          { title: "High Mileage", desc: "Ride 1,000 miles on your own bike", icon: "minecart_normal" } ] } ] },
+      { title: "Be Bold", desc: "Make your first Wikipedia edit", icon: "book_writable", done: true, children: [
+        { title: "Copyeditor", desc: "Fix the wording of an article", icon: "feather", done: true },
+        { title: "Citation Needed", desc: "Add a reliable source to an article", icon: "paper", done: true },
+        { title: "Autoconfirmed", desc: "Make 10 edits over 4 days", icon: "name_tag", done: true, children: [
+          { title: "Extended Confirmed", desc: "Make 500 edits over 30 days", icon: "iron_ingot", done: true, children: [
+            { title: "Pending Changes", desc: "Get the pending changes reviewer right", icon: "ender_eye" },
+            { title: "Mop and Bucket", desc: "Become a Wikipedia administrator", icon: "bucket_water", type: "challenge" } ] } ] },
+        { title: "New Article", desc: "Write a new article that survives review", icon: "sign", children: [
+          { title: "Did You Know", desc: "Get a hook onto the Main Page", icon: "glowstone_dust", type: "goal", children: [
+            { title: "Good Article", desc: "Get an article promoted to Good Article", icon: "gold_ingot", type: "goal", children: [
+              { title: "Featured Article", desc: "Bring an article to Featured Article status", icon: "nether_star", type: "challenge" } ] } ] } ] } ] } ] },
 
     /* ---- travel ---- */
     { title: "Passport Stamp", desc: "Travel abroad", icon: "map_empty", done: true, children: [
@@ -276,7 +288,7 @@ function drawTerrain(w, h) {
   const depthScale = Math.max(1, rows / 34);  // keep bedrock for the last row or two however tall the map is
   for (let r = 0; r < rows; r++) {
     const d = Math.floor(r / depthScale);
-    const f = Math.max(0.12, 0.6 - d / 25 * 0.3);
+    const f = Math.max(0.28, 0.6 - d / 25 * 0.3);
     for (let col = 0; col < cols; col++) {
       const R = rng(r * 7919 + col * 104729 + 1337);
       const j = Math.floor(R() * (1 + d)) + Math.floor(d / 2);
