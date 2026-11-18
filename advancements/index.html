@@ -160,13 +160,17 @@ const ROOT =
       { title: "Be Bold", desc: "Make your first Wikipedia edit", icon: "book_writable", done: true, children: [
         { title: "Copyeditor", desc: "Fix the wording of an article", icon: "feather", done: true },
         { title: "Citation Needed", desc: "Add a reliable source to an article", icon: "paper", done: true },
-        { title: "Autoconfirmed", desc: "Make 10 edits over 4 days", icon: "name_tag", done: true, children: [
-          { title: "Extended Confirmed", desc: "Make 500 edits over 30 days", icon: "iron_ingot", children: [
+        { title: "Undo", desc: "Revert a bad edit", icon: "clock_00", done: true },
+        { title: "Short Description", desc: "Add a short description to an article", icon: "name_tag", done: true },
+        { title: "Have Your Say", desc: "Vote in an Articles for Deletion discussion", icon: "sign", done: true },
+        { title: "Autoconfirmed", desc: "Make 10 edits over 4 days", icon: "iron_nugget", done: true, children: [
+          { title: "Hundred Edits", desc: "Make 100 edits", icon: "book_written", done: true, children: [
+          { title: "Extended Confirmed", desc: "Make 500 edits over 30 days", icon: "iron_ingot", progress: [105, 500], children: [
             { title: "Pending Changes", desc: "Get the pending changes reviewer right", icon: "ender_eye" },
-            { title: "Mop and Bucket", desc: "Become a Wikipedia administrator", icon: "bucket_water", type: "challenge" } ] } ] },
+            { title: "Mop and Bucket", desc: "Become a Wikipedia administrator", icon: "bucket_water", type: "challenge" } ] } ] } ] },
         { title: "Picture This", desc: "Make a figure, upload it to Wikimedia Commons and use it in an article", icon: "painting" },
         { title: "WikiProject", desc: "Join a WikiProject", icon: "book_normal" },
-        { title: "New Article", desc: "Write a new article that survives review", icon: "sign", children: [
+        { title: "New Article", desc: "Write a new article that survives review", icon: "map_filled", children: [
           { title: "Did You Know", desc: "Get a hook onto the Main Page", icon: "glowstone_dust", type: "goal", children: [
             { title: "Good Article", desc: "Get an article promoted to Good Article", icon: "gold_ingot", type: "goal", children: [
               { title: "Featured Article", desc: "Bring an article to Featured Article status", icon: "nether_star", type: "challenge" } ] } ] } ] } ] },
