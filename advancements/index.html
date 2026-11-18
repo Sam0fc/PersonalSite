@@ -124,80 +124,84 @@ const ROOT =
 
     /* ---- hobbies ---- */
     { title: "Side Quests", desc: "Find something to do outside work", icon: "fishing_rod_uncast", done: true, children: [
-      { title: "Breathe Easy", desc: "Earn your PADI Open Water Diver certification", icon: "bucket_water", done: true, children: [
-        { title: "Dry Suit", desc: "Earn the Dry Suit Diver specialty", icon: "leather", done: true },
-        { title: "Deeper", desc: "Earn PADI Advanced Open Water", icon: "prismarine_crystals", done: true, children: [
-          { title: "Wreck Diver", desc: "Earn the Wreck Diver specialty", icon: "oak_boat" },
-          { title: "Rescue Diver", desc: "Complete the Rescue Diver course", icon: "totem", type: "goal" },
-          { id: "nitrox", title: "Enriched Air", desc: "Earn the Enriched Air Nitrox specialty", icon: "dragon_breath", done: true } ] } ] },
-      { title: "Into the Dark", desc: "Join a caving club", icon: "torch_on", done: true, children: [
-        { title: "On Rope", desc: "Learn single rope technique (SRT)", icon: "lead", done: true, children: [
-          { title: "Cave Diver", desc: "Dive through a flooded cave", icon: "prismarine_shard", type: "challenge", also: ["nitrox"] },
-          { title: "Rope Underground", desc: "Use SRT on a real cave pitch", icon: "string", children: [
-            { title: "Big Pitch", desc: "Abseil a 50 m pitch", icon: "feather", type: "goal" } ] } ] },
-        { title: "Agen Allwedd", desc: "Go caving in Aggy", icon: "coal", done: true },
-        { title: "Craig a Ffynnon", desc: "Go caving in Craig a Ffynnon", icon: "flint", done: true },
-        { title: "Ogof Ffynnon Ddu", desc: "Go caving in OFD", icon: "iron_nugget", done: true },
-        { title: "Surveyor", desc: "Survey new passage", icon: "map_empty", type: "goal", children: [
-          { title: "Trip Leader", desc: "Lead a trip underground", icon: "diamond", type: "challenge" } ] } ] },
-      { title: "On the Wall", desc: "Go climbing", icon: "iron_pickaxe", done: true, children: [
-        { title: "V1", desc: "Send a V1 boulder problem", icon: "coal", done: true, children: [
-          { title: "V2", desc: "Send a V2 boulder problem", icon: "flint", done: true, children: [
-          { title: "V3", desc: "Send a V3 boulder problem", icon: "iron_ingot", children: [
-            { title: "V5", desc: "Send a V5 boulder problem", icon: "gold_ingot", type: "goal", children: [
-              { title: "V7", desc: "Send a V7 boulder problem", icon: "diamond", type: "challenge" } ] } ] } ] } ] },
-        { title: "Belay Check", desc: "Pass a belay test", icon: "lead", children: [
-          { title: "On the Sharp End", desc: "Lead climb a route", icon: "string", children: [
-            { title: "6a", desc: "Climb a 6a sport route", icon: "iron_nugget", children: [
-              { title: "6c", desc: "Climb a 6c sport route", icon: "emerald", type: "goal", children: [
-                { title: "7a", desc: "Climb a 7a sport route", icon: "nether_star", type: "challenge" } ] } ] } ] } ] } ] },
-      { title: "Sub-30 5k", desc: "Run 5k in under 30 minutes", icon: "sugar", children: [
-        { title: "Half Marathon", desc: "Run a half marathon", icon: "rabbit_foot", type: "goal", children: [
-          { title: "Marathon", desc: "Run a full marathon", icon: "carrot_golden", type: "challenge" } ] } ] },
-      { title: "Push Off", desc: "Ride a skateboard", icon: "stick", done: true, children: [
-        { title: "Ollie", desc: "Land an ollie", icon: "feather", done: true, children: [
-          { title: "Pop Shove-it", desc: "Land a pop shove-it", icon: "snowball" },
-          { title: "Kickflip", desc: "Land a kickflip", icon: "blaze_rod", type: "goal", children: [
-            { title: "Heelflip", desc: "Land a heelflip", icon: "blaze_powder" },
-            { title: "Tre Flip", desc: "Land a 360 flip", icon: "ghast_tear", type: "challenge" } ] },
-          { title: "50-50", desc: "Grind a ledge or rail", icon: "iron_nugget" } ] },
-        { title: "Manual", desc: "Hold a manual", icon: "slimeball", done: true, children: [
-          { title: "Nose Manual", desc: "Hold a nose manual", icon: "magma_cream" } ] },
-        { title: "Drop In", desc: "Drop in on a ramp", icon: "minecart_normal" } ] },
+      { title: "Touch Grass", desc: "Take up a sport", icon: "apple", done: true, children: [
+        { title: "Breathe Easy", desc: "Earn your PADI Open Water Diver certification", icon: "bucket_water", done: true, children: [
+          { title: "Dry Suit", desc: "Earn the Dry Suit Diver specialty", icon: "leather", done: true },
+          { title: "Deeper", desc: "Earn PADI Advanced Open Water", icon: "prismarine_crystals", done: true, children: [
+            { title: "Wreck Diver", desc: "Earn the Wreck Diver specialty", icon: "oak_boat" },
+            { title: "Rescue Diver", desc: "Complete the Rescue Diver course", icon: "totem", type: "goal" },
+            { id: "nitrox", title: "Enriched Air", desc: "Earn the Enriched Air Nitrox specialty", icon: "dragon_breath", done: true } ] } ] },
+        { title: "Into the Dark", desc: "Join a caving club", icon: "torch_on", done: true, children: [
+          { title: "On Rope", desc: "Learn single rope technique (SRT)", icon: "lead", done: true, children: [
+            { title: "Cave Diver", desc: "Dive through a flooded cave", icon: "prismarine_shard", type: "challenge", also: ["nitrox"] },
+            { title: "Rope Underground", desc: "Use SRT on a real cave pitch", icon: "string", children: [
+              { title: "Big Pitch", desc: "Abseil a 50 m pitch", icon: "feather", type: "goal" } ] } ] },
+          { title: "Agen Allwedd", desc: "Go caving in Aggy", icon: "coal", done: true },
+          { title: "Craig a Ffynnon", desc: "Go caving in Craig a Ffynnon", icon: "flint", done: true },
+          { title: "Ogof Ffynnon Ddu", desc: "Go caving in OFD", icon: "iron_nugget", done: true },
+          { title: "Surveyor", desc: "Survey new passage", icon: "map_empty", type: "goal", children: [
+            { title: "Trip Leader", desc: "Lead a trip underground", icon: "diamond", type: "challenge" } ] } ] },
+        { title: "On the Wall", desc: "Go climbing", icon: "iron_pickaxe", done: true, children: [
+          { title: "V1", desc: "Send a V1 boulder problem", icon: "coal", done: true, children: [
+            { title: "V2", desc: "Send a V2 boulder problem", icon: "flint", done: true, children: [
+            { title: "V3", desc: "Send a V3 boulder problem", icon: "iron_ingot", children: [
+              { title: "V5", desc: "Send a V5 boulder problem", icon: "gold_ingot", type: "goal", children: [
+                { title: "V7", desc: "Send a V7 boulder problem", icon: "diamond", type: "challenge" } ] } ] } ] } ] },
+          { title: "Belay Check", desc: "Pass a belay test", icon: "lead", children: [
+            { title: "On the Sharp End", desc: "Lead climb a route", icon: "string", children: [
+              { title: "6a", desc: "Climb a 6a sport route", icon: "iron_nugget", children: [
+                { title: "6c", desc: "Climb a 6c sport route", icon: "emerald", type: "goal", children: [
+                  { title: "7a", desc: "Climb a 7a sport route", icon: "nether_star", type: "challenge" } ] } ] } ] } ] } ] },
+        { title: "Sub-30 5k", desc: "Run 5k in under 30 minutes", icon: "sugar", children: [
+          { title: "Half Marathon", desc: "Run a half marathon", icon: "rabbit_foot", type: "goal", children: [
+            { title: "Marathon", desc: "Run a full marathon", icon: "carrot_golden", type: "challenge" } ] } ] },
+        { title: "Push Off", desc: "Ride a skateboard", icon: "stick", done: true, children: [
+          { title: "Ollie", desc: "Land an ollie", icon: "feather", done: true, children: [
+            { title: "Pop Shove-it", desc: "Land a pop shove-it", icon: "snowball" },
+            { title: "Kickflip", desc: "Land a kickflip", icon: "blaze_rod", type: "goal", children: [
+              { title: "Heelflip", desc: "Land a heelflip", icon: "blaze_powder" },
+              { title: "Tre Flip", desc: "Land a 360 flip", icon: "ghast_tear", type: "challenge" } ] },
+            { title: "50-50", desc: "Grind a ledge or rail", icon: "iron_nugget" } ] },
+          { title: "Manual", desc: "Hold a manual", icon: "slimeball", done: true, children: [
+            { title: "Nose Manual", desc: "Hold a nose manual", icon: "magma_cream" } ] },
+          { title: "Drop In", desc: "Drop in on a ramp", icon: "minecart_normal" } ] },
+      ] },
+      { title: "Extremely Online", desc: "Take up an internet hobby", icon: "record_13", done: true, children: [
+        { title: "Ranked", desc: "Play MCSR Ranked", icon: "ender_eye", done: true, children: [
+          { title: "The End?", desc: "Finish a run", icon: "end_crystal", children: [
+            { title: "Sub 30", desc: "Finish a run in under 30 minutes", icon: "clock_00", type: "goal", children: [
+              { title: "Sub 20", desc: "Finish a run in under 20 minutes", icon: "sugar", type: "challenge" } ] } ] },
+          { title: "Placements", desc: "Finish your Ranked placement matches", icon: "name_tag", children: [
+            { title: "Elo Climber", desc: "Reach your target Elo", icon: "emerald", type: "goal" } ] } ] },
+        { title: "Be Bold", desc: "Make your first Wikipedia edit", icon: "book_writable", done: true, children: [
+          { title: "Copyeditor", desc: "Fix the wording of an article", icon: "feather", done: true },
+          { title: "Citation Needed", desc: "Add a reliable source to an article", icon: "paper", done: true },
+          { title: "Undo", desc: "Revert a bad edit", icon: "clock_00", done: true },
+          { title: "Short Description", desc: "Add a short description to an article", icon: "name_tag", done: true },
+          { title: "Have Your Say", desc: "Vote in an Articles for Deletion discussion", icon: "sign", done: true },
+          { title: "Autoconfirmed", desc: "Make 10 edits over 4 days", icon: "iron_nugget", done: true, children: [
+            { title: "Hundred Edits", desc: "Make 100 edits", icon: "book_written", done: true, children: [
+            { title: "Extended Confirmed", desc: "Make 500 edits over 30 days", icon: "iron_ingot", progress: [105, 500], children: [
+              { title: "Pending Changes", desc: "Get the pending changes reviewer right", icon: "ender_eye" },
+              { title: "Mop and Bucket", desc: "Become a Wikipedia administrator", icon: "bucket_water", type: "challenge" } ] } ] } ] },
+          { title: "Picture This", desc: "Make a figure, upload it to Wikimedia Commons and use it in an article", icon: "painting" },
+          { title: "WikiProject", desc: "Join a WikiProject", icon: "book_normal" },
+          { title: "New Article", desc: "Write a new article that survives review", icon: "map_filled", children: [
+            { title: "Did You Know", desc: "Get a hook onto the Main Page", icon: "glowstone_dust", type: "goal", children: [
+              { title: "Good Article", desc: "Get an article promoted to Good Article", icon: "gold_ingot", type: "goal", children: [
+                { title: "Featured Article", desc: "Bring an article to Featured Article status", icon: "nether_star", type: "challenge" } ] } ] } ] } ] },
+      ] },
       { title: "Trial Lesson", desc: "Take the controls on a trial flying lesson", icon: "feather", done: true, children: [
         { title: "Ground School", desc: "Pass all nine PPL theory exams", icon: "book_normal", progress: [0, 9] },
         { title: "Class 2", desc: "Pass a Class 2 aviation medical", icon: "apple_golden" },
         { title: "First Solo", desc: "Fly the circuit alone", icon: "elytra", type: "goal", children: [
           { title: "Cross-Country", desc: "Fly a solo qualifying cross-country", icon: "compass_00", children: [
             { title: "Licensed to Fly", desc: "Earn your Private Pilot Licence", icon: "fireworks", type: "challenge" } ] } ] } ] },
-      { title: "Ranked", desc: "Play MCSR Ranked", icon: "ender_eye", done: true, children: [
-        { title: "The End?", desc: "Finish a run", icon: "end_crystal", children: [
-          { title: "Sub 30", desc: "Finish a run in under 30 minutes", icon: "clock_00", type: "goal", children: [
-            { title: "Sub 20", desc: "Finish a run in under 20 minutes", icon: "sugar", type: "challenge" } ] } ] },
-        { title: "Placements", desc: "Finish your Ranked placement matches", icon: "name_tag", children: [
-          { title: "Elo Climber", desc: "Reach your target Elo", icon: "emerald", type: "goal" } ] } ] },
       { title: "Saving Up", desc: "Save for a Maeving RM2", icon: "gold_nugget", children: [
         { title: "Keys in Hand", desc: "Buy your Maeving RM2", icon: "saddle", type: "goal", children: [
           { title: "CBT", desc: "Pass Compulsory Basic Training", icon: "iron_helmet", children: [
             { title: "Full Licence", desc: "Pass your full motorcycle licence", icon: "name_tag", type: "goal" } ] },
           { title: "High Mileage", desc: "Ride 1,000 miles on your own bike", icon: "minecart_normal" } ] } ] },
-      { title: "Be Bold", desc: "Make your first Wikipedia edit", icon: "book_writable", done: true, children: [
-        { title: "Copyeditor", desc: "Fix the wording of an article", icon: "feather", done: true },
-        { title: "Citation Needed", desc: "Add a reliable source to an article", icon: "paper", done: true },
-        { title: "Undo", desc: "Revert a bad edit", icon: "clock_00", done: true },
-        { title: "Short Description", desc: "Add a short description to an article", icon: "name_tag", done: true },
-        { title: "Have Your Say", desc: "Vote in an Articles for Deletion discussion", icon: "sign", done: true },
-        { title: "Autoconfirmed", desc: "Make 10 edits over 4 days", icon: "iron_nugget", done: true, children: [
-          { title: "Hundred Edits", desc: "Make 100 edits", icon: "book_written", done: true, children: [
-          { title: "Extended Confirmed", desc: "Make 500 edits over 30 days", icon: "iron_ingot", progress: [105, 500], children: [
-            { title: "Pending Changes", desc: "Get the pending changes reviewer right", icon: "ender_eye" },
-            { title: "Mop and Bucket", desc: "Become a Wikipedia administrator", icon: "bucket_water", type: "challenge" } ] } ] } ] },
-        { title: "Picture This", desc: "Make a figure, upload it to Wikimedia Commons and use it in an article", icon: "painting" },
-        { title: "WikiProject", desc: "Join a WikiProject", icon: "book_normal" },
-        { title: "New Article", desc: "Write a new article that survives review", icon: "map_filled", children: [
-          { title: "Did You Know", desc: "Get a hook onto the Main Page", icon: "glowstone_dust", type: "goal", children: [
-            { title: "Good Article", desc: "Get an article promoted to Good Article", icon: "gold_ingot", type: "goal", children: [
-              { title: "Featured Article", desc: "Bring an article to Featured Article status", icon: "nether_star", type: "challenge" } ] } ] } ] } ] },
       { title: "Enlisted", desc: "Enlist in the UCN on Bridge Command", icon: "iron_helmet", done: true, children: [
         { title: "Lieutenant", desc: "Make Lieutenant", icon: "name_tag", done: true, children: [
           { title: "Friendly Fire", desc: "Lose an allied ship to friendly nuclear fire and get demoted to Sub Lieutenant", icon: "fireball", type: "challenge", secret: true, done: true, children: [
@@ -223,8 +227,8 @@ const ROOT =
           { title: "Inter-Service", desc: "Work exceptionally well with another service, such as the Marine Corps", icon: "lead" },
           { title: "Adamas Belt Campaign", desc: "Serve in the Adamas Belt before the UVP war", icon: "quartz", done: true },
           { title: "Campaign Star", desc: "Complete two five-mission extended deployments", icon: "gold_nugget", done: true },
-          { title: "Propaganda", desc: "Give a confirmed testimonial about your UCN service", icon: "painting", done: true } ] } ] } ] },
-
+          { title: "Propaganda", desc: "Give a confirmed testimonial about your UCN service", icon: "painting", done: true } ] } ] },
+    ] },
     /* ---- travel ---- */
     { title: "Passport Stamp", desc: "Travel abroad", icon: "map_empty", done: true, children: [
       { title: "Ten Countries", desc: "Visit 10 countries", icon: "compass_00", done: true, children: [
