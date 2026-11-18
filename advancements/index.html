@@ -80,90 +80,91 @@ canvas.bm { display: block; }
 
 <script>
 /* =====================================================================
-   GOALS: edit this list. Each category is one tree on the map.
+   GOALS: edit this tree. Everything grows from one root, like the old achievement map.
    Each node:
      title, desc
      icon: an item texture name from textures/item/ (e.g. "book_normal")
      type: "task" (plain frame, default) | "goal" or "challenge" (spiky frame)
      done: true when achieved
      secret: true to keep it off the map until it's done
+     id + also: ["otherId"] to require more than one parent (draws an extra line)
      progress: [current, target] (optional)
      children: [...more nodes]
    A goal is "open" (blinking) when its parent is done, and dark until then.
    The font only has plain ASCII (plus £), so stick to those characters.
    ===================================================================== */
-const CATEGORIES = [
-  { name: "Academia", root:
-    { title: "Matriculation", desc: "Start a degree at university", icon: "book_normal", done: true, children: [
-      { title: "Graduate", desc: "Finish your undergraduate degree", icon: "book_writable", done: true, children: [
-        { title: "Master of Science", desc: "Finish your master's", icon: "knowledge_book", type: "goal", done: true, children: [
-          { title: "First Class", desc: "Get a First in your master's", icon: "nether_star", type: "challenge", secret: true, done: true },
-          { title: "Applications In", desc: "Apply for PhD programmes", icon: "paper", children: [
-            { title: "Offer Letter", desc: "Get a PhD offer", icon: "book_written", type: "goal", children: [
-              { title: "Peer Reviewed", desc: "Publish a first-author paper", icon: "sign" },
-              { title: "Call Me Doctor", desc: "Be awarded a PhD", icon: "book_enchanted", type: "challenge" } ] } ] } ] } ] } ] } },
+const ROOT =
+  { title: "New World", desc: "Spawn in", icon: "seeds_wheat", done: true, children: [
 
-  { name: "Scuba", root:
-    { title: "Breathe Easy", desc: "Earn your PADI Open Water Diver certification", icon: "bucket_water", done: true, children: [
-      { title: "Deeper", desc: "Earn PADI Advanced Open Water", icon: "prismarine_crystals", done: true, children: [
-        { title: "Wreck Diver", desc: "Earn the Wreck Diver specialty", icon: "oak_boat" },
-        { title: "Rescue Diver", desc: "Complete the Rescue Diver course", icon: "totem", type: "goal" },
-        { title: "Cave Diver", desc: "Train to dive in caves", icon: "prismarine_shard", type: "challenge" } ] },
-      { title: "Dry Suit", desc: "Earn the Dry Suit Diver specialty", icon: "leather", done: true },
-      { title: "Enriched Air", desc: "Earn the Enriched Air Nitrox specialty", icon: "dragon_breath", done: true } ] } },
+    /* ---- school and science ---- */
+    { title: "Nine Nines", desc: "Get grade 9 in nine GCSEs", icon: "book_normal", done: true, children: [
+      { title: "Further Maths", desc: "Get an A^ in Further Maths", icon: "quartz", done: true },
+      { title: "Advanced Placement", desc: "Get 5s in nine AP exams, including Physics, Chemistry, Statistics and Computer Science", icon: "book_written", done: true, children: [
+        { title: "Perfect Score", desc: "Score 1600 on the SAT", icon: "gold_ingot", type: "challenge", secret: true, done: true },
+        { title: "Matriculation", desc: "Start at Selwyn College, Cambridge", icon: "sign", done: true, children: [
+          { title: "Natural Scientist", desc: "Graduate with a BA in Natural Sciences (Earth Sciences)", icon: "book_writable", done: true, children: [
+            { title: "Field Work", desc: "Run a geochemical field project on the River Great Ouse", icon: "bucket_empty", done: true },
+            { title: "Master of Science", desc: "Finish an MSci in Quantitative Climate and Environmental Science", icon: "knowledge_book", type: "goal", done: true, children: [
+              { title: "First Class", desc: "Get a First in your master's", icon: "nether_star", type: "challenge", secret: true, done: true },
+              { title: "Applications In", desc: "Apply for PhD programmes", icon: "paper", children: [
+                { title: "Offer Letter", desc: "Get a PhD offer", icon: "experience_bottle", type: "goal", children: [
+                  { title: "Peer Reviewed", desc: "Publish a first-author paper", icon: "map_filled" },
+                  { title: "Call Me Doctor", desc: "Be awarded a PhD", icon: "book_enchanted", type: "challenge" } ] } ] } ] } ] } ] } ] } ] },
 
-  { name: "Piloting", root:
-    { title: "Trial Lesson", desc: "Take the controls on a trial flying lesson", icon: "feather", children: [
-      { title: "Ground School", desc: "Pass all nine PPL theory exams", icon: "book_normal", progress: [0, 9] },
-      { title: "Class 2", desc: "Pass a Class 2 aviation medical", icon: "apple_golden" },
-      { title: "First Solo", desc: "Fly the circuit alone", icon: "elytra", type: "goal", children: [
-        { title: "Cross-Country", desc: "Fly a solo qualifying cross-country", icon: "compass_00", children: [
-          { title: "Licensed to Fly", desc: "Earn your Private Pilot Licence", icon: "fireworks", type: "challenge" } ] } ] } ] } },
-
-  { name: "Caving", root:
-    { title: "Into the Dark", desc: "Join a caving club", icon: "torch_on", done: true, children: [
-      { title: "Agen Allwedd", desc: "Go caving in Aggy", icon: "coal", done: true },
-      { title: "Craig a Ffynnon", desc: "Go caving in Craig a Ffynnon", icon: "flint", done: true },
-      { title: "Ogof Ffynnon Ddu", desc: "Go caving in OFD", icon: "iron_nugget", done: true },
-      { title: "On Rope", desc: "Learn single rope technique (SRT)", icon: "lead", done: true, children: [
-        { title: "Rope Underground", desc: "Use SRT on a real cave pitch", icon: "string", children: [
-          { title: "Big Pitch", desc: "Abseil a 50 m pitch", icon: "feather", type: "goal" } ] } ] },
-      { title: "Surveyor", desc: "Survey new passage", icon: "map_empty", type: "goal", children: [
-        { title: "Trip Leader", desc: "Lead a trip underground", icon: "diamond", type: "challenge" } ] } ] } },
-
-  { name: "MCSR", root:
-    { title: "Ranked", desc: "Play MCSR Ranked", icon: "ender_eye", children: [
-      { title: "The End?", desc: "Finish a run", icon: "end_crystal", children: [
-        { title: "Sub 30", desc: "Finish a run in under 30 minutes", icon: "clock_00", type: "goal", children: [
-          { title: "Sub 20", desc: "Finish a run in under 20 minutes", icon: "sugar", type: "challenge" } ] } ] },
-      { title: "Placements", desc: "Finish your Ranked placement matches", icon: "name_tag", children: [
-        { title: "Elo Climber", desc: "Reach your target Elo", icon: "emerald", type: "goal" } ] } ] } },
-
-  { name: "Software", root:
+    /* ---- software ---- */
     { title: "Hello, World", desc: "Write your first program", icon: "redstone_dust", done: true, children: [
       { title: "Self Hosted", desc: "Run your own server at home", icon: "comparator", done: true, children: [
         { title: "Five Nines", desc: "Keep a service up for a whole year", icon: "clock_00", type: "challenge" } ] },
       { title: "It's For You", desc: "Build software that someone else uses", icon: "cake", done: true },
-      { title: "Open Source", desc: "Publish an open-source project", icon: "book_writable", children: [
+      { title: "Open Source", desc: "Publish an open-source package (coreclean)", icon: "minecart_chest", done: true, children: [
         { title: "First Contributor", desc: "Merge a pull request from someone else", icon: "emerald", children: [
           { title: "Maintainer", desc: "Maintain an open-source project with many users", icon: "diamond", type: "challenge" } ] } ] },
-      { title: "Upstream", desc: "Get a pull request merged into someone else's open-source project", icon: "repeater" } ] } },
+      { title: "Upstream", desc: "Get a pull request merged into someone else's open-source project", icon: "repeater" } ] },
 
-  { name: "Travel", root:
+    /* ---- hobbies ---- */
+    { title: "Side Quests", desc: "Find something to do outside work", icon: "fishing_rod_uncast", done: true, children: [
+      { title: "Breathe Easy", desc: "Earn your PADI Open Water Diver certification", icon: "bucket_water", done: true, children: [
+        { title: "Dry Suit", desc: "Earn the Dry Suit Diver specialty", icon: "leather", done: true },
+        { title: "Deeper", desc: "Earn PADI Advanced Open Water", icon: "prismarine_crystals", done: true, children: [
+          { title: "Wreck Diver", desc: "Earn the Wreck Diver specialty", icon: "oak_boat" },
+          { title: "Rescue Diver", desc: "Complete the Rescue Diver course", icon: "totem", type: "goal" },
+          { id: "nitrox", title: "Enriched Air", desc: "Earn the Enriched Air Nitrox specialty", icon: "dragon_breath", done: true } ] } ] },
+      { title: "Into the Dark", desc: "Join a caving club", icon: "torch_on", done: true, children: [
+        { title: "On Rope", desc: "Learn single rope technique (SRT)", icon: "lead", done: true, children: [
+          { title: "Cave Diver", desc: "Dive through a flooded cave", icon: "prismarine_shard", type: "challenge", also: ["nitrox"] },
+          { title: "Rope Underground", desc: "Use SRT on a real cave pitch", icon: "string", children: [
+            { title: "Big Pitch", desc: "Abseil a 50 m pitch", icon: "feather", type: "goal" } ] } ] },
+        { title: "Agen Allwedd", desc: "Go caving in Aggy", icon: "coal", done: true },
+        { title: "Craig a Ffynnon", desc: "Go caving in Craig a Ffynnon", icon: "flint", done: true },
+        { title: "Ogof Ffynnon Ddu", desc: "Go caving in OFD", icon: "iron_nugget", done: true },
+        { title: "Surveyor", desc: "Survey new passage", icon: "map_empty", type: "goal", children: [
+          { title: "Trip Leader", desc: "Lead a trip underground", icon: "diamond", type: "challenge" } ] } ] },
+      { title: "Trial Lesson", desc: "Take the controls on a trial flying lesson", icon: "feather", done: true, children: [
+        { title: "Ground School", desc: "Pass all nine PPL theory exams", icon: "book_normal", progress: [0, 9] },
+        { title: "Class 2", desc: "Pass a Class 2 aviation medical", icon: "apple_golden" },
+        { title: "First Solo", desc: "Fly the circuit alone", icon: "elytra", type: "goal", children: [
+          { title: "Cross-Country", desc: "Fly a solo qualifying cross-country", icon: "compass_00", children: [
+            { title: "Licensed to Fly", desc: "Earn your Private Pilot Licence", icon: "fireworks", type: "challenge" } ] } ] } ] },
+      { title: "Ranked", desc: "Play MCSR Ranked", icon: "ender_eye", done: true, children: [
+        { title: "The End?", desc: "Finish a run", icon: "end_crystal", children: [
+          { title: "Sub 30", desc: "Finish a run in under 30 minutes", icon: "clock_00", type: "goal", children: [
+            { title: "Sub 20", desc: "Finish a run in under 20 minutes", icon: "sugar", type: "challenge" } ] } ] },
+        { title: "Placements", desc: "Finish your Ranked placement matches", icon: "name_tag", children: [
+          { title: "Elo Climber", desc: "Reach your target Elo", icon: "emerald", type: "goal" } ] } ] },
+      { title: "Saving Up", desc: "Save for a Maeving RM2", icon: "gold_nugget", children: [
+        { title: "Keys in Hand", desc: "Buy your Maeving RM2", icon: "saddle", type: "goal", children: [
+          { title: "CBT", desc: "Pass Compulsory Basic Training", icon: "iron_helmet", children: [
+            { title: "Full Licence", desc: "Pass your full motorcycle licence", icon: "name_tag", type: "goal" } ] },
+          { title: "High Mileage", desc: "Ride 1,000 miles on your own bike", icon: "minecart_normal" } ] } ] } ] },
+
+    /* ---- travel ---- */
     { title: "Passport Stamp", desc: "Travel abroad", icon: "map_empty", done: true, children: [
       { title: "Ten Countries", desc: "Visit 10 countries", icon: "compass_00", done: true, children: [
         { title: "Thirty Countries", desc: "Visit 30 countries", icon: "map_filled", done: true, children: [
           { title: "Fifty Countries", desc: "Visit 50 countries", icon: "oak_boat", type: "goal", progress: [39, 50], children: [
             { title: "Hundred Club", desc: "Visit 100 countries", icon: "fireworks", type: "challenge", progress: [39, 100] } ] } ] } ] },
-      { title: "Seven Continents", desc: "Set foot on every continent", icon: "elytra", type: "challenge", progress: [4, 7] } ] } },
-
-  { name: "Motorcycle", root:
-    { title: "Saving Up", desc: "Save for a Maeving RM2", icon: "gold_nugget", children: [
-      { title: "Keys in Hand", desc: "Buy your Maeving RM2", icon: "saddle", type: "goal", children: [
-        { title: "CBT", desc: "Pass Compulsory Basic Training", icon: "iron_helmet", children: [
-          { title: "Full Licence", desc: "Pass your full motorcycle licence", icon: "name_tag", type: "goal" } ] },
-        { title: "High Mileage", desc: "Ride 1,000 miles on your own bike", icon: "minecart_normal" } ] } ] } },
-];
+      { title: "Seven Continents", desc: "Set foot on every continent", icon: "elytra", type: "challenge", progress: [4, 7] } ] },
+  ] };
 
 /* ---------------- helpers ---------------- */
 const U = 2;                       // CSS pixels per GUI pixel
@@ -243,29 +244,17 @@ function layoutTree(root) {
     n.row = ks.length ? (ks[0].row + ks[ks.length - 1].row) / 2 : row++;
   })(root, 0, null);
   const nodes = flatten(root);
-  nodes.forEach(n => { n.cx = n.depth * 2; n.cy = n.row * 1.5; });
+  nodes.forEach(n => { n.cx = n.depth * 2; n.cy = n.row * 1.25; });
   return { nodes, w: Math.max(...nodes.map(n => n.cx)) + 1, h: Math.max(...nodes.map(n => n.cy)) + 1 };
 }
 function layoutMap() {
-  const trees = CATEGORIES.map(c => layoutTree(c.root));
-  const COLS = 3, GAP = 2;
-  const colW = [], rowH = [];
-  trees.forEach((t, i) => {
-    const c = i % COLS, r = Math.floor(i / COLS);
-    colW[c] = Math.max(colW[c] || 0, t.w); rowH[r] = Math.max(rowH[r] || 0, t.h);
-  });
-  const all = [];
-  trees.forEach((t, i) => {
-    const c = i % COLS, r = Math.floor(i / COLS);
-    const ox = colW.slice(0, c).reduce((a, b) => a + b + GAP, 0);
-    const oy = rowH.slice(0, r).reduce((a, b) => a + b + GAP, 0) + (rowH[r] - t.h) / 2;
-    t.nodes.forEach(n => { n.x = Math.round((ox + n.cx) * CELL); n.y = Math.round((oy + n.cy) * CELL); all.push(n); });
-  });
-  all.forEach(n => {
-    n.state = n.done ? "done" : (!n.parent || n.parent.done) ? "open" : "locked";
-  });
-  const w = Math.max(...all.map(n => n.x)) + 26, h = Math.max(...all.map(n => n.y)) + 26;
-  return { nodes: all, w, h };
+  const t = layoutTree(ROOT);
+  const byId = {};
+  t.nodes.forEach(n => { n.x = Math.round(n.cx * CELL); n.y = Math.round(n.cy * CELL); if (n.id) byId[n.id] = n; });
+  t.nodes.forEach(n => { n.reqs = [n.parent, ...(n.also || []).map(id => byId[id])].filter(Boolean); });
+  t.nodes.forEach(n => { n.state = n.done ? "done" : n.reqs.every(p => p.done) ? "open" : "locked"; });
+  const w = Math.max(...t.nodes.map(n => n.x)) + 26, h = Math.max(...t.nodes.map(n => n.y)) + 26;
+  return { nodes: t.nodes, w, h };
 }
 
 /* ---------------- map rendering ---------------- */
@@ -320,12 +309,14 @@ function drawLines(w, h, ox, oy) {
   const colorOf = n => n.state === "done" ? C.lineDone : n.state === "open" ? C.lineOpen : C.lineLocked;
   const arrows = {};
   const order = { locked: 0, open: 1, done: 2 };
-  MAP.nodes.filter(n => n.parent).sort((a, b) => order[a.state] - order[b.state]).forEach(n => {
+  const edges = MAP.nodes.flatMap(n => n.reqs.map(p => [p, n]));
+  edges.sort((a, b) => order[a[1].state] - order[b[1].state]).forEach(([p, n]) => {
     const col = colorOf(n);
-    const k5 = ox + n.x + 13, l5 = oy + n.y + 13, j6 = ox + n.parent.x + 13, k6 = oy + n.parent.y + 13;
+    const k5 = ox + n.x + 13, l5 = oy + n.y + 13, j6 = ox + p.x + 13, k6 = oy + p.y + 13;
     g.fillStyle = col;
     g.fillRect(Math.min(k5, j6), l5, Math.abs(k5 - j6) + 1, 1);     // along the child's row
     g.fillRect(j6, Math.min(l5, k6), 1, Math.abs(l5 - k6) + 1);     // down the parent's column
+    if (k5 === j6) return;  // straight down from a node in the same column: no room for an arrow
     arrows[col] = arrows[col] || tintedArrow(col);
     g.drawImage(arrows[col], k5 - 11 - 7, l5 - 5);
   });
@@ -348,7 +339,7 @@ function build() {
     b.type = "button"; b.className = "node " + n.state;
     b.style.left = (ox + n.x) * U + "px"; b.style.top = (oy + n.y) * U + "px";
     b.innerHTML = `<span class="fr" style="background-image:url(textures/gui/${special(n) ? "frame_special" : "frame"}.png)"></span><img alt="" src="${item(n.icon)}">`;
-    b.setAttribute("aria-label", `${n.title}. ${n.desc}${n.done ? ". Taken" : n.state === "locked" ? `. Requires ${n.parent.title}` : ""}`);
+    b.setAttribute("aria-label", `${n.title}. ${n.desc}${n.done ? ". Taken" : n.state === "locked" ? `. Requires ${n.reqs.filter(p => !p.done).map(p => p.title).join(" and ")}` : ""}`);
     n.el = b;
     b.addEventListener("pointermove", e => { if (e.pointerType === "mouse" && !drag) showTip(n, e.clientX, e.clientY); });
     b.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") pinned ? showTip(pinned) : hideTip(); });
@@ -372,9 +363,9 @@ function clampPan() {
   mapEl.style.transform = `translate(${pan.x}px, ${pan.y}px)`;
 }
 function startPan() {
-  // open on the first tree, the way the old screen opened on Taking Inventory
-  const first = MAP.nodes[0];
-  pan = { x: -((mapSize.ox + first.x - 2 * CELL) * U), y: -((mapSize.oy + first.y - 3 * CELL) * U) };
+  // open on the root, the way the old screen opened on Taking Inventory
+  const root = MAP.nodes[0];
+  pan = { x: -((mapSize.ox + root.x - 2 * CELL) * U), y: -((mapSize.oy + root.y + 13) * U - vp.clientHeight / 2) };
   clampPan();
 }
 
@@ -385,7 +376,8 @@ function showTip(n, clientX, clientY) {
   const lines = [[n.title, titleColor]];
   wrap(n.desc, width).forEach((s, i) => lines.push([s, C.desc, i === 0 ? 3 : 0]));
   if (n.progress) lines.push([`${n.progress[0]}/${n.progress[1]}`, C.desc]);
-  if (n.state === "locked") wrap(`Requires '${n.parent.title}'`, width).forEach((s, i) => lines.push([s, C.requires, i === 0 ? 3 : 0]));
+  if (n.state === "locked") n.reqs.filter(p => !p.done).forEach((p, j) =>
+    wrap(`Requires '${p.title}'`, width).forEach((s, i) => lines.push([s, C.requires, i === 0 && j === 0 ? 3 : 0])));
   if (n.secret) lines.push(["Secret Achievement", C.secret, 3]);
   if (n.done) lines.push(["Taken!", C.taken, n.secret ? 0 : 3]);
   tip.innerHTML = ""; tip.appendChild(textCanvas(lines));
