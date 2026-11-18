@@ -140,6 +140,19 @@ const ROOT =
         { title: "Ogof Ffynnon Ddu", desc: "Go caving in OFD", icon: "iron_nugget", done: true },
         { title: "Surveyor", desc: "Survey new passage", icon: "map_empty", type: "goal", children: [
           { title: "Trip Leader", desc: "Lead a trip underground", icon: "diamond", type: "challenge" } ] } ] },
+      { title: "On the Wall", desc: "Go climbing", icon: "iron_pickaxe", children: [
+        { title: "V1", desc: "Send a V1 boulder problem", icon: "coal", children: [
+          { title: "V3", desc: "Send a V3 boulder problem", icon: "iron_ingot", children: [
+            { title: "V5", desc: "Send a V5 boulder problem", icon: "gold_ingot", type: "goal", children: [
+              { title: "V7", desc: "Send a V7 boulder problem", icon: "diamond", type: "challenge" } ] } ] } ] },
+        { title: "Belay Check", desc: "Pass a belay test", icon: "lead", children: [
+          { title: "On the Sharp End", desc: "Lead climb a route", icon: "string", children: [
+            { title: "6a", desc: "Climb a 6a sport route", icon: "iron_nugget", children: [
+              { title: "6c", desc: "Climb a 6c sport route", icon: "emerald", type: "goal", children: [
+                { title: "7a", desc: "Climb a 7a sport route", icon: "nether_star", type: "challenge" } ] } ] } ] } ] } ] },
+      { title: "Sub-30 5k", desc: "Run 5k in under 30 minutes", icon: "sugar", children: [
+        { title: "Half Marathon", desc: "Run a half marathon", icon: "rabbit_foot", type: "goal", children: [
+          { title: "Marathon", desc: "Run a full marathon", icon: "carrot_golden", type: "challenge" } ] } ] },
       { title: "Trial Lesson", desc: "Take the controls on a trial flying lesson", icon: "feather", done: true, children: [
         { title: "Ground School", desc: "Pass all nine PPL theory exams", icon: "book_normal", progress: [0, 9] },
         { title: "Class 2", desc: "Pass a Class 2 aviation medical", icon: "apple_golden" },
