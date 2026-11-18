@@ -167,7 +167,33 @@ const ROOT =
         { title: "New Article", desc: "Write a new article that survives review", icon: "sign", children: [
           { title: "Did You Know", desc: "Get a hook onto the Main Page", icon: "glowstone_dust", type: "goal", children: [
             { title: "Good Article", desc: "Get an article promoted to Good Article", icon: "gold_ingot", type: "goal", children: [
-              { title: "Featured Article", desc: "Bring an article to Featured Article status", icon: "nether_star", type: "challenge" } ] } ] } ] } ] } ] },
+              { title: "Featured Article", desc: "Bring an article to Featured Article status", icon: "nether_star", type: "challenge" } ] } ] } ] } ] },
+      { title: "Enlisted", desc: "Enlist in the UCN on Bridge Command", icon: "iron_helmet", done: true, children: [
+        { title: "Lieutenant", desc: "Make Lieutenant", icon: "name_tag", done: true, children: [
+          { title: "Friendly Fire", desc: "Lose an allied ship to friendly nuclear fire and get demoted to Sub Lieutenant", icon: "fireball", type: "challenge", secret: true, done: true, children: [
+            { title: "Reinstated", desc: "Win back your Lieutenant's rank", icon: "name_tag", done: true } ] },
+          { title: "Lt Cmdr", desc: "Make Lieutenant Commander", icon: "diamond", type: "goal" } ] },
+        { title: "First Deployment", desc: "Fly your first mission", icon: "compass_00", done: true, children: [
+          { title: "Ten Missions", desc: "Fly 10 missions", icon: "map_empty", done: true, children: [
+            { title: "Fifty Missions", desc: "Fly 50 missions", icon: "map_filled", done: true, children: [
+              { title: "Centurion", desc: "Fly 100 missions", icon: "ender_pearl", type: "goal", progress: [81, 100] } ] } ] } ] },
+        { title: "Every Station", desc: "Serve in all 14 bridge roles", icon: "book_written", done: true, progress: [14, 14], children: [
+          { title: "All Hands", desc: "Serve in all four subteams", icon: "minecart_command_block", done: true, progress: [4, 4] } ] },
+        { title: "Decorated", desc: "Earn a UCN medal", icon: "gold_ingot", done: true, progress: [10, 13], children: [
+          { title: "Confederation Commendation", desc: "Show ingenuity and bravery in the field", icon: "iron_ingot", done: true, children: [
+            { title: "Confederation Star", desc: "Show exceptional ingenuity and bravery in the field", icon: "nether_star", type: "goal", done: true, children: [
+              { title: "Medal of Valour", desc: "Show the highest bravery, valour and self-sacrifice", icon: "totem", type: "challenge" } ] } ] },
+          { title: "Defensive Operations", desc: "Perform combat duties exceptionally", icon: "iron_chestplate", done: true, children: [
+            { title: "With Bar", desc: "Earn the Defensive Operations Medal twice", icon: "iron_chestplate", type: "goal", done: true } ] },
+          { title: "Diplomatic Service", desc: "Uphold the Diplomatic Corps' values of negotiation", icon: "paper", done: true },
+          { title: "Engineering Medal", desc: "Preserve ship and crew in the hardest circumstances", icon: "shears", done: true },
+          { title: "Intelligence Service", desc: "Further the UCN's intelligence-gathering", icon: "ender_eye", done: true },
+          { title: "Scientific Research", desc: "Further scientific research in the Adamas Belt", icon: "experience_bottle", done: true },
+          { title: "Medical Service", desc: "Give exceptional medical help to officers, allies or enemies", icon: "apple_golden" },
+          { title: "Inter-Service", desc: "Work exceptionally well with another service, such as the Marine Corps", icon: "lead" },
+          { title: "Adamas Belt Campaign", desc: "Serve in the Adamas Belt before the UVP war", icon: "quartz", done: true },
+          { title: "Campaign Star", desc: "Complete two five-mission extended deployments", icon: "gold_nugget", done: true },
+          { title: "Propaganda", desc: "Give a confirmed testimonial about your UCN service", icon: "painting", done: true } ] } ] } ] },
 
     /* ---- travel ---- */
     { title: "Passport Stamp", desc: "Travel abroad", icon: "map_empty", done: true, children: [
