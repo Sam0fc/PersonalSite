@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Embedding Chaos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: #fff; color: #000; font-family: 'Source Sans 3', 'Source Sans Pro', sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 12px 48px; }
+  .fig { margin: 0 0 44px; }
+  .fig.narrow .plot { max-width: 400px; margin: 0 auto; }
+  #fig6 { cursor: pointer; }
+  .plot { user-select: none; -webkit-user-select: none; touch-action: none; }
+  .bar { height: 2px; background: #efedf5; margin: 4px 0 0; transition: opacity .4s; opacity: 0; }
+  .bar > div { height: 100%; width: 0; background: #6a51a3; transition: width .15s; }
+  .ctls { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; margin-top: 8px; }
+  .ctl { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+  .ctl .sym { font-style: italic; min-width: 1.4em; text-align: right; }
+  .ctl .sym sub { font-style: normal; font-size: 0.7em; }
+  .ctl .val { font-variant-numeric: tabular-nums; min-width: 3.2em; color: #444; font-size: 13px; }
+  input[type=range] { width: 150px; accent-color: #6a51a3; }
+</style>
+</head>
+<body>
+<main>
+  <div class="fig narrow"><div class="plot" id="fig1"></div><div class="ctls" id="fig1-c"></div></div>
+  <div class="fig"><div class="plot" id="fig2"></div><div class="ctls" id="fig2-c"></div></div>
+  <div class="fig"><div class="plot" id="fig3"></div><div class="ctls" id="fig3-c"></div></div>
+  <div class="fig"><div class="plot" id="fig4"></div><div class="bar"><div id="fig4-p"></div></div><div class="bar"><div id="fig4i-p"></div></div><div class="ctls" id="fig4-c"></div></div>
+  <div class="fig"><div class="plot" id="fig5"></div><div class="bar"><div id="fig5-p"></div></div><div class="ctls" id="fig5-c"></div></div>
+  <div class="fig"><div class="plot" id="fig6"></div><div class="bar"><div id="fig6-p"></div></div></div>
+  <div class="fig"><div class="plot" id="fig7"></div><div class="bar"><div id="fig7-p"></div></div><div class="ctls" id="fig7-c"></div></div>
+  <div class="fig"><div class="plot" id="fig8"></div><div class="bar"><div id="fig8-p"></div></div><div class="ctls" id="fig8-c"></div></div>
+  <div class="fig"><div class="plot" id="figa1"></div><div class="bar"><div id="figa1-p"></div></div></div>
+</main>
+<script id="core-src">
+// Numerical core: a JavaScript port of report_code.ipynb (ChaosEmbeddings).
+// Runs both on the main thread (cheap figures) and inside Web Workers (heavy figures).
+'use strict';
+
+/* ---------------- random numbers ---------------- */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeNormal(seed) {
+  const r = mulberry32(seed); let spare = null;
+  return function () {
+    if (spare !== null) { const s = spare; spare = null; return s; }
+    let u, v, s;
+    do { u = r() * 2 - 1; v = r() * 2 - 1; s = u * u + v * v; } while (s >= 1 || s === 0);
+    const m = Math.sqrt(-2 * Math.log(s) / s); spare = v * m; return u * m;
+  };
+}
+
+/* ---------------- Lorenz 63 ---------------- */
+function lorenzFn(p) {
+  const S = p.sigma, R = p.rho, B = p.beta;
+  return function (t, x, out) {
+    out[0] = S * (x[1] - x[0]);
+    out[1] = x[0] * (R - x[2]) - x[1];
+    out[2] = x[0] * x[1] - B * x[2];
+  };
+}
+
+/* ---------------- scipy.integrate.solve_ivp(method='RK45') port ---------------- */
+const RK = (function () {
+  const C = [0, 1 / 5, 3 / 10, 4 / 5, 8 / 9, 1];
+  const A = [[], [1 / 5], [3 / 40, 9 / 40], [44 / 45, -56 / 15, 32 / 9],
+    [19372 / 6561, -25360 / 2187, 64448 / 6561, -212 / 729],
+    [9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656]];
+  const B = [35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84];
+  const E = [-71 / 57600, 0, 71 / 16695, -71 / 1920, 17253 / 339200, -22 / 525, 1 / 40];
+  const P = [
+    [1, -8048581381 / 2820520608, 8663915743 / 2820520608, -12715105075 / 11282082432],
+    [0, 0, 0, 0],
+    [0, 131558114200 / 32700410799, -68118460800 / 10900136933, 87487479700 / 32700410799],
+    [0, -1754552775 / 470086768, 14199869525 / 1410260304, -10690763975 / 1880347072],
+    [0, 127303824393 / 49829197408, -318862633887 / 49829197408, 701980252875 / 199316789632],
+    [0, -282668133 / 205662961, 2019193451 / 616988883, -1453857185 / 822651844],
+    [0, 40617522 / 29380423, -110615467 / 29380423, 69997945 / 29380423]];
+  return { C, A, B, E, P };
+})();
+
+// Returns Float64Array[n][tEval.length]
+function solveIVP(fun, t0, tBound, y0, tEval, rtol = 1e-3, atol = 1e-6) {
+  const n = y0.length, ne = tEval.length;
+  const out = []; for (let i = 0; i < n; i++) out.push(new Float64Array(ne));
+  const { C, A, B, E, P } = RK;
+  const rms = (v) => { let s = 0; for (let i = 0; i < v.length; i++) s += v[i] * v[i]; return Math.sqrt(s / v.length); };
+  let t = t0, y = Float64Array.from(y0);
+  const f = new Float64Array(n); fun(t, y, f);
+  // initial step
+  let hAbs;
+  {
+    const interval = Math.abs(tBound - t0);
+    if (interval === 0) hAbs = 0; else {
+      const sc = new Float64Array(n), a = new Float64Array(n), b = new Float64Array(n);
+      for (let i = 0; i < n; i++) { sc[i] = atol + Math.abs(y[i]) * rtol; a[i] = y[i] / sc[i]; b[i] = f[i] / sc[i]; }
+      const d0 = rms(a), d1 = rms(b);
+      let h0 = (d0 < 1e-5 || d1 < 1e-5) ? 1e-6 : 0.01 * d0 / d1;
+      h0 = Math.min(h0, interval);
+      const y1 = new Float64Array(n), f1 = new Float64Array(n);
+      for (let i = 0; i < n; i++) y1[i] = y[i] + h0 * f[i];
+      fun(t0 + h0, y1, f1);
+      for (let i = 0; i < n; i++) a[i] = (f1[i] - f[i]) / sc[i];
+      const d2 = rms(a) / h0;
+      const h1 = (d1 <= 1e-15 && d2 <= 1e-15) ? Math.max(1e-6, h0 * 1e-3) : Math.pow(0.01 / Math.max(d1, d2), 1 / 5);
+      hAbs = Math.min(100 * h0, h1, interval);
+    }
+  }
+  const K = []; for (let s = 0; s < 7; s++) K.push(new Float64Array(n));
+  const yNew = new Float64Array(n), fNew = new Float64Array(n), tmp = new Float64Array(n), err = new Float64Array(n);
+  const Q = []; for (let i = 0; i < n; i++) Q.push(new Float64Array(4));
+  let ei = 0;
+  // points equal to t0 at the very start are produced by dense output of the first step (x=0)
+  let guard = 0;
+  while (ei < ne && guard++ < 1e7) {
+    if (t >= tBound) break;
+    let accepted = false, rejected = false, tNew, h;
+    while (!accepted) {
+      h = hAbs; tNew = t + h;
+      if (tNew - tBound > 0) tNew = tBound;
+      h = tNew - t; hAbs = Math.abs(h);
+      // rk_step
+      K[0].set(f);
+      for (let s = 1; s < 6; s++) {
+        const as = A[s];
+        for (let i = 0; i < n; i++) { let dy = 0; for (let j = 0; j < s; j++) dy += K[j][i] * as[j]; tmp[i] = y[i] + dy * h; }
+        fun(t + C[s] * h, tmp, K[s]);
+      }
+      for (let i = 0; i < n; i++) { let s = 0; for (let j = 0; j < 6; j++) s += K[j][i] * B[j]; yNew[i] = y[i] + h * s; }
+      fun(t + h, yNew, fNew); K[6].set(fNew);
+      for (let i = 0; i < n; i++) {
+        let s = 0; for (let j = 0; j < 7; j++) s += K[j][i] * E[j];
+        const sc = atol + Math.max(Math.abs(y[i]), Math.abs(yNew[i])) * rtol;
+        err[i] = s * h / sc;
+      }
+      const en = rms(err);
+      if (en < 1) {
+        let factor = en === 0 ? 10 : Math.min(10, 0.9 * Math.pow(en, -0.2));
+        if (rejected) factor = Math.min(1, factor);
+        hAbs *= factor; accepted = true;
+      } else {
+        hAbs *= Math.max(0.2, 0.9 * Math.pow(en, -0.2)); rejected = true;
+      }
+    }
+    // dense output
+    for (let i = 0; i < n; i++) for (let c = 0; c < 4; c++) { let s = 0; for (let j = 0; j < 7; j++) s += K[j][i] * P[j][c]; Q[i][c] = s; }
+    while (ei < ne && tEval[ei] <= tNew) {
+      const x = (tEval[ei] - t) / h;
+      const x2 = x * x, x3 = x2 * x, x4 = x3 * x;
+      for (let i = 0; i < n; i++) out[i][ei] = y[i] + h * (Q[i][0] * x + Q[i][1] * x2 + Q[i][2] * x3 + Q[i][3] * x4);
+      ei++;
+    }
+    t = tNew; y.set(yNew); f.set(fNew);
+  }
+  return out;
+}
+
+function linspace(a, b, n) { const r = new Float64Array(n); for (let i = 0; i < n; i++) r[i] = n === 1 ? a : a + (b - a) * i / (n - 1); return r; }
+
+function integrateLorenz(p, x0, start, end, numSteps, nEval) {
+  const ne = nEval === undefined ? numSteps + 1 : nEval;
+  const t = linspace(start, end, ne);
+  const y = solveIVP(lorenzFn(p), start, end, x0, t);
+  return { t, y };
+}
+
+/* ---------------- KD-tree (any dimension) ---------------- */
+// pts: array of d Float64Arrays (column series), using indices [0, n)
+function KDTree(cols, n) {
+  const d = cols.length;
+  const data = new Float64Array(n * d);
+  for (let i = 0; i < n; i++) for (let j = 0; j < d; j++) data[i * d + j] = cols[j][i];
+  const idx = new Int32Array(n); for (let i = 0; i < n; i++) idx[i] = i;
+  const LEAF = 12;
+  const nodeLo = [], nodeHi = [], nodeDim = [], nodeSplit = [], nodeL = [], nodeR = [];
+  const bmin = [], bmax = [];
+  function build(lo, hi) {
+    const id = nodeLo.length;
+    nodeLo.push(lo); nodeHi.push(hi); nodeDim.push(-1); nodeSplit.push(0); nodeL.push(-1); nodeR.push(-1);
+    const mn = new Float64Array(d).fill(Infinity), mx = new Float64Array(d).fill(-Infinity);
+    for (let i = lo; i < hi; i++) { const b = idx[i] * d; for (let j = 0; j < d; j++) { const v = data[b + j]; if (v < mn[j]) mn[j] = v; if (v > mx[j]) mx[j] = v; } }
+    bmin.push(mn); bmax.push(mx);
+    if (hi - lo <= LEAF) return id;
+    let dim = 0, sp = -1; for (let j = 0; j < d; j++) if (mx[j] - mn[j] > sp) { sp = mx[j] - mn[j]; dim = j; }
+    if (sp <= 0) return id;
+    const mid = (lo + hi) >> 1;
+    // quickselect on dim
+    let l = lo, r = hi - 1;
+    while (l < r) {
+      const pv = data[idx[(l + r) >> 1] * d + dim];
+      let i = l, j = r;
+      while (i <= j) {
+        while (data[idx[i] * d + dim] < pv) i++;
+        while (data[idx[j] * d + dim] > pv) j--;
+        if (i <= j) { const tt = idx[i]; idx[i] = idx[j]; idx[j] = tt; i++; j--; }
+      }
+      if (mid <= j) r = j; else if (mid >= i) l = i; else break;
+    }
+    nodeDim[id] = dim; nodeSplit[id] = data[idx[mid] * d + dim];
+    const L = build(lo, mid); const R = build(mid, hi);
+    nodeL[id] = L; nodeR[id] = R;
+    return id;
+  }
+  build(0, n);
+  this.d = d; this.n = n; this.data = data; this.idx = idx;
+  this.nodeLo = Int32Array.from(nodeLo); this.nodeHi = Int32Array.from(nodeHi); this.nodeDim = Int32Array.from(nodeDim);
+  this.nodeSplit = Float64Array.from(nodeSplit); this.nodeL = Int32Array.from(nodeL); this.nodeR = Int32Array.from(nodeR);
+  this.bmin = bmin; this.bmax = bmax;
+}
+// k nearest neighbours for each query; returns Int32Array(nq*k) sorted ascending distance
+KDTree.prototype.queryAll = function (qcols, nq, k) {
+  const d = this.d, data = this.data, idx = this.idx;
+  const nodeLo = this.nodeLo, nodeHi = this.nodeHi, nodeDim = this.nodeDim, nodeSplit = this.nodeSplit, nodeL = this.nodeL, nodeR = this.nodeR;
+  const bmin = this.bmin, bmax = this.bmax;
+  k = Math.min(k, this.n);
+  const res = new Int32Array(nq * k);
+  const hd = new Float64Array(k), hi_ = new Int32Array(k);
+  const q = new Float64Array(d);
+  const stack = new Int32Array(256), stackD = new Float64Array(256);
+  for (let qi = 0; qi < nq; qi++) {
+    for (let j = 0; j < d; j++) q[j] = qcols[j][qi];
+    let hs = 0; // heap size (max-heap on hd)
+    let worst = Infinity;
+    let sp = 0; stack[sp] = 0; stackD[sp] = 0; sp++;
+    while (sp > 0) {
+      sp--; const node = stack[sp]; const nd = stackD[sp];
+      if (hs === k && nd >= worst) continue;
+      const dim = nodeDim[node];
+      if (dim < 0) {
+        for (let p = nodeLo[node]; p < nodeHi[node]; p++) {
+          const pi = idx[p], b = pi * d; let dist = 0;
+          for (let j = 0; j < d; j++) { const t = data[b + j] - q[j]; dist += t * t; }
+          if (hs < k) {
+            // push
+            let c = hs++; hd[c] = dist; hi_[c] = pi;
+            while (c > 0) { const par = (c - 1) >> 1; if (hd[par] >= hd[c]) break; let t = hd[par]; hd[par] = hd[c]; hd[c] = t; let u = hi_[par]; hi_[par] = hi_[c]; hi_[c] = u; c = par; }
+            if (hs === k) worst = hd[0];
+          } else if (dist < worst) {
+            hd[0] = dist; hi_[0] = pi; let c = 0;
+            while (true) { const l = 2 * c + 1, r = l + 1; let m = c; if (l < hs && hd[l] > hd[m]) m = l; if (r < hs && hd[r] > hd[m]) m = r; if (m === c) break; let t = hd[m]; hd[m] = hd[c]; hd[c] = t; let u = hi_[m]; hi_[m] = hi_[c]; hi_[c] = u; c = m; }
+            worst = hd[0];
+          }
+        }
+      } else {
+        const L = nodeL[node], R = nodeR[node];
+        // min box distance for children
+        const dl = boxDist(bmin[L], bmax[L], q, d), dr = boxDist(bmin[R], bmax[R], q, d);
+        if (dl < dr) { stack[sp] = R; stackD[sp] = dr; sp++; stack[sp] = L; stackD[sp] = dl; sp++; }
+        else { stack[sp] = L; stackD[sp] = dl; sp++; stack[sp] = R; stackD[sp] = dr; sp++; }
+      }
+    }
+    // heap sort ascending
+    const base = qi * k;
+    let m = hs;
+    while (m > 0) {
+      res[base + m - 1] = hi_[0];
+      m--; hd[0] = hd[m]; hi_[0] = hi_[m]; let c = 0;
+      while (true) { const l = 2 * c + 1, r = l + 1; let mm = c; if (l < m && hd[l] > hd[mm]) mm = l; if (r < m && hd[r] > hd[mm]) mm = r; if (mm === c) break; let t = hd[mm]; hd[mm] = hd[c]; hd[c] = t; let u = hi_[mm]; hi_[mm] = hi_[c]; hi_[c] = u; c = mm; }
+    }
+  }
+  return { nbrs: res, k };
+};
+function boxDist(mn, mx, q, d) {
+  let s = 0;
+  for (let j = 0; j < d; j++) { const v = q[j]; let t = 0; if (v < mn[j]) t = mn[j] - v; else if (v > mx[j]) t = v - mx[j]; s += t * t; }
+  return s;
+}
+
+/* ---------------- data handling ---------------- */
+function sliceCols(cols, a, b) { return cols.map(c => c.subarray(a, b)); }
+function partitionData(cols, split, numSteps) {
+  const si = Math.trunc(numSteps * split);
+  return [sliceCols(cols, 0, si), sliceCols(cols, si, cols[0].length)];
+}
+function addNoise(cols, levels, rnd) {
+  return cols.map((c, i) => { const o = new Float64Array(c.length); for (let j = 0; j < c.length; j++) o[j] = c[j] + rnd() * levels[i]; return o; });
+}
+function ranges(cols) { return cols.map(c => { let mn = Infinity, mx = -Infinity; for (const v of c) { if (v < mn) mn = v; if (v > mx) mx = v; } return mx - mn; }); }
+
+/* ---------------- nearest neighbour forecasting ---------------- */
+// Precompute neighbours once (on full training set) with a margin, then emulate
+// cKDTree(training[:, :-fc]) by discarding indices >= nTrain - fc.
+function neighbourCache(training, test, kmax) {
+  const nTrain = training[0].length, nTest = test[0].length;
+  const tree = new KDTree(training, nTrain);
+  const q = tree.queryAll(test, nTest, Math.min(kmax, nTrain));
+  return { nbrs: q.nbrs, kmax: q.k, nTrain, nTest };
+}
+function forecastFromCache(cache, training, k, fc) {
+  const d = training.length, { nbrs, kmax, nTrain, nTest } = cache;
+  const out = training.map(() => new Float64Array(nTest));
+  const lim = nTrain - fc;
+  const s = new Float64Array(d);
+  for (let i = 0; i < nTest; i++) {
+    s.fill(0); let cnt = 0; const b = i * kmax;
+    for (let j = 0; j < kmax && cnt < k; j++) {
+      const id = nbrs[b + j];
+      if (id < lim) { for (let q = 0; q < d; q++) s[q] += training[q][id + fc]; cnt++; }
+    }
+    for (let q = 0; q < d; q++) out[q][i] = s[q] / cnt;
+  }
+  return out;
+}
+function corrcoef(a, b) {
+  const n = a.length; let ma = 0, mb = 0;
+  for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+  ma /= n; mb /= n;
+  let sab = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < n; i++) { const x = a[i] - ma, y = b[i] - mb; sab += x * y; saa += x * x; sbb += y * y; }
+  return sab / Math.sqrt(saa * sbb);
+}
+function calculateCorrelation(forecast, test, fc) {
+  return forecast.map((f, i) => corrcoef(f.subarray(0, f.length - fc), test[i].subarray(fc)));
+}
+function polyfit1(x, y) {
+  const n = x.length; let mx = 0, my = 0;
+  for (let i = 0; i < n; i++) { mx += x[i]; my += y[i]; }
+  mx /= n; my /= n; let sxy = 0, sxx = 0;
+  for (let i = 0; i < n; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; }
+  const m = sxy / sxx; return [m, my - m * mx];
+}
+// calculate_entropy: returns { h (slope/2 per dim), x, y (y[fcIndex][dim]) }
+function calculateEntropy(training, test, fcArray, k, dt, cache, onProgress) {
+  const maxfc = Math.max(...fcArray);
+  if (!cache) cache = neighbourCache(training, test, k + maxfc);
+  const x = Float64Array.from(fcArray, f => f * dt);
+  const y = [];
+  for (let i = 0; i < fcArray.length; i++) {
+    const fc = fcArray[i];
+    const f = forecastFromCache(cache, training, k, fc);
+    y.push(calculateCorrelation(f, test, fc).map(r => Math.log(1 - r)));
+    if (onProgress) onProgress(i, x, y);
+  }
+  const d = training.length, h = [];
+  for (let j = 0; j < d; j++) h.push(polyfit1(x, y.map(r => r[j]))[0] / 2);
+  return { h, x, y, cache };
+}
+
+// Collect all points within squared radius r2 of q into (D, I); returns count (grows buffers as needed).
+KDTree.prototype.rangeCollect = function (q, r2, buf) {
+  const d = this.d, data = this.data, idx = this.idx;
+  const nodeLo = this.nodeLo, nodeHi = this.nodeHi, nodeDim = this.nodeDim, nodeL = this.nodeL, nodeR = this.nodeR, bmin = this.bmin, bmax = this.bmax;
+  const stack = buf.stack; let sp = 0, cnt = 0; stack[sp++] = 0;
+  while (sp > 0) {
+    const node = stack[--sp];
+    if (boxDist(bmin[node], bmax[node], q, d) > r2) continue;
+    if (nodeDim[node] < 0) {
+      for (let p = nodeLo[node]; p < nodeHi[node]; p++) {
+        const pi = idx[p], b = pi * d; let dist = 0;
+        for (let j = 0; j < d; j++) { const t = data[b + j] - q[j]; dist += t * t; }
+        if (dist <= r2) {
+          if (cnt === buf.D.length) { const nD = new Float64Array(cnt * 2), nI = new Int32Array(cnt * 2); nD.set(buf.D); nI.set(buf.I); buf.D = nD; buf.I = nI; }
+          buf.D[cnt] = dist; buf.I[cnt] = pi; cnt++;
+        }
+      }
+    } else { stack[sp++] = nodeL[node]; stack[sp++] = nodeR[node]; }
+  }
+  return cnt;
+};
+// partial sort: after the call, D[0..m) hold the m smallest of D[0..n)
+function selectSmallest(D, I, n, m) {
+  let lo = 0, hi = n - 1; const k = m - 1;
+  while (lo < hi) {
+    const pv = D[(lo + hi) >> 1]; let i = lo, j = hi;
+    while (i <= j) {
+      while (D[i] < pv) i++;
+      while (D[j] > pv) j--;
+      if (i <= j) { let t = D[i]; D[i] = D[j]; D[j] = t; let u = I[i]; I[i] = I[j]; I[j] = u; i++; j--; }
+    }
+    if (k <= j) hi = j; else if (k >= i) lo = i; else break;
+  }
+}
+// Same result as calculateEntropy, but streams the test set and accumulates correlation sums, using an
+// adaptive-radius neighbour search, so memory stays small and large k stays fast (sampling-rate ensemble).
+function calculateEntropyStreaming(training, test, fcArray, k, dt) {
+  const d = training.length, nTrain = training[0].length, nTest = test[0].length;
+  const maxfc = Math.max(...fcArray), kmax = Math.min(k + maxfc, nTrain);
+  const tree = new KDTree(training, nTrain);
+  const nf = fcArray.length;
+  const S = fcArray.map(() => Array.from({ length: d }, () => new Float64Array(6))); // n, sf, st, sff, stt, sft
+  const f = new Float64Array(d), q = new Float64Array(d);
+  const buf = { D: new Float64Array(Math.max(1024, kmax * 4)), I: new Int32Array(Math.max(1024, kmax * 4)), stack: new Int32Array(512) };
+  let r2 = -1;
+  for (let j = 0; j < nTest; j++) {
+    for (let z = 0; z < d; z++) q[z] = test[z][j];
+    let cnt;
+    if (r2 < 0) { // first query: exact k-th distance
+      const e = tree.queryAll(test.map(c => c.subarray(j, j + 1)), 1, kmax); const last = e.nbrs[e.k - 1];
+      let s2 = 0; for (let z = 0; z < d; z++) s2 += (training[z][last] - q[z]) ** 2; r2 = s2 * 1.0001 + 1e-300;
+    }
+    while ((cnt = tree.rangeCollect(q, r2, buf)) < kmax) r2 = r2 * 2.25 + 1e-300;
+    selectSmallest(buf.D, buf.I, cnt, kmax);
+    let kth = 0; for (let u = 0; u < kmax; u++) if (buf.D[u] > kth) kth = buf.D[u];
+    r2 = kth * 1.1 + 1e-300; // next guess
+    const D = buf.D, I = buf.I;
+    // only indices >= nTrain - maxfc can be ineligible, so at most 2*maxfc of the farthest points matter
+    const T = Math.min(kmax, 2 * maxfc + 2); const topU = new Int32Array(T).fill(-1), topD = new Float64Array(T).fill(-1);
+    for (let u = 0; u < kmax; u++) {
+      const dv = D[u]; if (dv <= topD[T - 1]) continue;
+      let p = T - 1; while (p > 0 && topD[p - 1] < dv) { topD[p] = topD[p - 1]; topU[p] = topU[p - 1]; p--; }
+      topD[p] = dv; topU[p] = u;
+    }
+    for (let fi = 0; fi < nf; fi++) {
+      const fc = fcArray[fi]; if (j + fc >= nTest) continue;
+      const lim = nTrain - fc;
+      f.fill(0); let c = 0;
+      for (let u = 0; u < kmax; u++) { const id = I[u]; if (id < lim) { for (let z = 0; z < d; z++) f[z] += training[z][id + fc]; c++; } }
+      // remove the farthest eligible neighbours until exactly k remain
+      for (let t = 0; t < T && c > k; t++) {
+        const u = topU[t]; if (u < 0) break; const id = I[u];
+        if (id < lim) { for (let z = 0; z < d; z++) f[z] -= training[z][id + fc]; c--; }
+      }
+      for (let z = 0; z < d; z++) {
+        const fv = f[z] / c, tv = test[z][j + fc], A = S[fi][z];
+        A[0]++; A[1] += fv; A[2] += tv; A[3] += fv * fv; A[4] += tv * tv; A[5] += fv * tv;
+      }
+    }
+  }
+  const x = Float64Array.from(fcArray, v => v * dt);
+  const y = S.map(per => per.map(A => { const n = A[0]; const r = (n * A[5] - A[1] * A[2]) / Math.sqrt((n * A[3] - A[1] * A[1]) * (n * A[4] - A[2] * A[2])); return Math.log(1 - r); }));
+  const h = []; for (let z = 0; z < d; z++) h.push(polyfit1(x, y.map(r => r[z]))[0] / 2);
+  return { h, x, y };
+}
+
+/* ---------------- RANSAC (sklearn RANSACRegressor, min_samples=2, absolute error) ---------------- */
+// Exhaustive search over all candidate pairs (superset of sklearn's 100 random trials).
+function ransacLine(x, y, thresh) {
+  const n = x.length; let bestN = -1, bestScore = -Infinity, bestMask = null;
+  const mask = new Uint8Array(n);
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    if (x[i] === x[j] || !isFinite(y[i]) || !isFinite(y[j])) continue;
+    const m = (y[j] - y[i]) / (x[j] - x[i]), c = y[i] - m * x[i];
+    let cnt = 0;
+    for (let q = 0; q < n; q++) { const ok = Math.abs(y[q] - (m * x[q] + c)) <= thresh; mask[q] = ok ? 1 : 0; cnt += ok; }
+    if (cnt < bestN) continue;
+    // R^2 of the candidate on its inliers (sklearn tie-break)
+    let my = 0; for (let q = 0; q < n; q++) if (mask[q]) my += y[q]; my /= cnt;
+    let ssr = 0, sst = 0; for (let q = 0; q < n; q++) if (mask[q]) { ssr += (y[q] - m * x[q] - c) ** 2; sst += (y[q] - my) ** 2; }
+    const score = sst > 0 ? 1 - ssr / sst : 0;
+    if (cnt > bestN || score > bestScore) { bestN = cnt; bestScore = score; bestMask = mask.slice(); }
+  }
+  if (!bestMask) return { slope: NaN, intercept: NaN, mask: new Uint8Array(n) };
+  const xi = [], yi = []; for (let q = 0; q < n; q++) if (bestMask[q]) { xi.push(x[q]); yi.push(y[q]); }
+  const [m, c] = polyfit1(xi, yi);
+  return { slope: m, intercept: c, mask: bestMask };
+}
+function calculateRansacSlope(x, y, plateau, thresh = 0.10) {
+  const d = y[0].length, slopes = [], intercepts = [], masks = [];
+  const xs = x.subarray(0, plateau);
+  for (let j = 0; j < d; j++) {
+    const ys = y.slice(0, plateau).map(r => r[j]);
+    const r = ransacLine(xs, ys, thresh);
+    slopes.push(r.slope); intercepts.push(r.intercept); masks.push(r.mask);
+  }
+  return { slopes, intercepts, masks };
+}
+
+/* ---------------- embedding ---------------- */
+function embed(x, tau, m) {
+  const n = x.length - (m - 1) * tau; const Z = [];
+  for (let i = 0; i < m; i++) Z.push(x.subarray(i * tau, i * tau + n));
+  return Z;
+}
+
+/* ---------------- sklearn mutual_info_regression (KSG, n_neighbors=3) ---------------- */
+function digamma(x) {
+  let r = 0;
+  while (x < 6) { r -= 1 / x; x += 1; }
+  const f = 1 / (x * x);
+  return r + Math.log(x) - 0.5 / x - f * (1 / 12 - f * (1 / 120 - f * (1 / 252 - f * (1 / 240 - f / 132))));
+}
+function scaleNoise(v, rnd) {
+  const n = v.length; let ss = 0, mean = 0;
+  for (let i = 0; i < n; i++) mean += v[i]; mean /= n;
+  for (let i = 0; i < n; i++) ss += (v[i] - mean) ** 2;
+  const sd = Math.sqrt(ss / n) || 1;
+  const o = new Float64Array(n); let ma = 0;
+  for (let i = 0; i < n; i++) { o[i] = v[i] / sd; ma += Math.abs(o[i]); }
+  ma /= n; const amp = 1e-10 * Math.max(1, ma);
+  for (let i = 0; i < n; i++) o[i] += amp * rnd();
+  return o;
+}
+const _nbuf = new DataView(new ArrayBuffer(8));
+function nextDown(r) {
+  if (!(r > 0)) return 0;
+  _nbuf.setFloat64(0, r); _nbuf.setBigUint64(0, _nbuf.getBigUint64(0) - 1n); return _nbuf.getFloat64(0);
+}
+function countWithin(sorted, v, r) { // number of s with |s - v| <= r (exact comparison, like KDTree.query_radius)
+  const n = sorted.length, pad = r * 1e-6 + 1e-300;
+  let lo = 0, hi = n;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (sorted[m] < v - r - pad) lo = m + 1; else hi = m; }
+  while (lo < n && Math.abs(sorted[lo] - v) > r && sorted[lo] < v) lo++;
+  let a = lo; hi = n;
+  let l2 = a;
+  while (l2 < hi) { const m = (l2 + hi) >> 1; if (sorted[m] <= v + r + pad) l2 = m + 1; else hi = m; }
+  while (l2 > a && Math.abs(sorted[l2 - 1] - v) > r) l2--;
+  return l2 - a;
+}
+function mutualInfoKSG(xr, yr, rnd, K = 3) {
+  const n = xr.length;
+  const x = scaleNoise(xr, rnd), y = scaleNoise(yr, rnd);
+  // sort by x
+  const ord = new Int32Array(n); for (let i = 0; i < n; i++) ord[i] = i;
+  ord.sort((a, b) => x[a] - x[b]);
+  const xs = new Float64Array(n), ys = new Float64Array(n);
+  for (let i = 0; i < n; i++) { xs[i] = x[ord[i]]; ys[i] = y[ord[i]]; }
+  const ySorted = Float64Array.from(ys).sort();
+  const best = new Float64Array(K);
+  let sx = 0, sy = 0;
+  for (let i = 0; i < n; i++) {
+    best.fill(Infinity);
+    const xi = xs[i], yi = ys[i];
+    for (let dir = -1; dir <= 1; dir += 2) {
+      for (let j = i + dir; j >= 0 && j < n; j += dir) {
+        const dx = Math.abs(xs[j] - xi);
+        if (dx >= best[K - 1]) break;
+        const dd = Math.max(dx, Math.abs(ys[j] - yi));
+        if (dd < best[K - 1]) { let p = K - 1; while (p > 0 && best[p - 1] > dd) { best[p] = best[p - 1]; p--; } best[p] = dd; }
+      }
+    }
+    let r = best[K - 1];
+    r = nextDown(r); // np.nextafter(r, 0)
+    const nx = countWithin(xs, xi, r) - 1, ny = countWithin(ySorted, yi, r) - 1;
+    sx += digamma(nx + 1); sy += digamma(ny + 1);
+  }
+  const mi = digamma(n) + digamma(K) - sx / n - sy / n;
+  return Math.max(0, mi);
+}
+// calc_smi_min
+function calcSmiMin(x, nTau, seed) {
+  const rnd = makeNormal(seed);
+  const smi = new Float64Array(nTau);
+  smi[0] = mutualInfoKSG(x, x, rnd);
+  for (let i = 1; i < nTau; i++) smi[i] = mutualInfoKSG(x.subarray(i), x.subarray(0, x.length - i), rnd);
+  const inc = []; for (let i = 0; i < nTau - 1; i++) if (smi[i + 1] - smi[i] >= 0) inc.push(i);
+  return { smi, ind: inc.length > 2 ? inc[2] : (inc.length ? inc[inc.length - 1] : 0) };
+}
+
+/* ---------------- Cao's method: calc_min_m (faithful port) ---------------- */
+function calcMinM(x, tau, mMax, w) {
+  const E = new Float64Array(mMax), Es = new Float64Array(mMax);
+  for (let mt = 1; mt <= mMax; mt++) {
+    const Z = embed(x, tau, mt), Z1 = embed(x, tau, mt + 1);
+    const n = Z[0].length, n1 = Z1[0].length;
+    const ratios = []; let sumDx = 0, cntDx = 0;
+    for (let i = 0; i < n; i++) {
+      // nearest neighbour (by distance) whose index exceeds w; argsort is stable so ties keep lowest index
+      let nn;
+      if (i > w) nn = i; // d[i,i] = 0 is the minimum and i > w
+      else {
+        let bd = Infinity; nn = -1;
+        for (let j = w + 1; j < n; j++) {
+          let s = 0; for (let q = 0; q < mt; q++) { const t = Z[q][i] - Z[q][j]; s += t * t; }
+          if (s < bd) { bd = s; nn = j; }
+        }
+      }
+      if (nn < n1) {
+        let d = 0, d1 = 0;
+        for (let q = 0; q < mt; q++) { const t = Z[q][i] - Z[q][nn]; d += t * t; }
+        for (let q = 0; q < mt + 1; q++) { const t = Z1[q][i] - Z1[q][nn]; d1 += t * t; }
+        d = Math.sqrt(d); d1 = Math.sqrt(d1);
+        const ia = i + mt * tau, ib = nn + mt * tau;
+        if (ia < x.length && ib < x.length) { sumDx += Math.abs(x[ia] - x[ib]); cntDx++; }
+        if (d === 0 && d1 === 0) { /* nan */ } else ratios.push(d1 / d);
+      }
+    }
+    let s = 0; for (const r of ratios) s += r;
+    E[mt - 1] = ratios.length ? s / ratios.length : NaN;
+    Es[mt - 1] = cntDx ? sumDx / cntDx : NaN;
+  }
+  const E1 = new Float64Array(mMax - 1), E2 = new Float64Array(mMax - 1);
+  for (let i = 0; i < mMax - 1; i++) { E1[i] = E[i + 1] / E[i]; E2[i] = Es[i + 1] / Es[i]; }
+  return { E1, E2 };
+}
+
+/* ---------------- Lyapunov spectrum (QR re-orthonormalisation, faithful port) ---------------- */
+function qrDecomp3(M) { // M: columns as vectors (3x3, row-major m[i][j]); modified Gram-Schmidt with numpy sign convention
+  const n = 3; const Q = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], R = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  const V = [0, 1, 2].map(j => [M[0][j], M[1][j], M[2][j]]);
+  for (let j = 0; j < n; j++) {
+    const v = V[j].slice();
+    for (let i = 0; i < j; i++) { const qi = [Q[0][i], Q[1][i], Q[2][i]]; const r = qi[0] * V[j][0] + qi[1] * V[j][1] + qi[2] * V[j][2]; R[i][j] = r; for (let k = 0; k < 3; k++) v[k] -= r * qi[k]; }
+    const nr = Math.hypot(v[0], v[1], v[2]); R[j][j] = nr;
+    for (let k = 0; k < 3; k++) Q[k][j] = v[k] / nr;
+  }
+  return { Q, R };
+}
+function calculateLyapunov(p, x0, numSteps, dt) {
+  const fun = lorenzFn(p);
+  let pert = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  const le = [0, 0, 0];
+  const over = [new Float64Array(numSteps), new Float64Array(numSteps), new Float64Array(numSteps)];
+  let x = Float64Array.from(x0);
+  for (let step = 0; step < numSteps; step++) {
+    const t0 = step * dt, t1 = (step + 1) * dt;
+    const te = [t1];
+    const r = solveIVP(fun, t0, t1, x, te);
+    const xs = x; x = Float64Array.from([r[0][0], r[1][0], r[2][0]]);
+    const ev = pert.map(pv => {
+      const s = solveIVP(fun, t0, t1, [xs[0] + pv[0], xs[1] + pv[1], xs[2] + pv[2]], te);
+      return [s[0][0] - x[0], s[1][0] - x[1], s[2][0] - x[2]];
+    });
+    // evolved_perturbations.T : columns are vectors
+    const M = [[ev[0][0], ev[1][0], ev[2][0]], [ev[0][1], ev[1][1], ev[2][1]], [ev[0][2], ev[1][2], ev[2][2]]];
+    const { Q, R } = qrDecomp3(M);
+    pert = [0, 1, 2].map(i => [Q[0][i], Q[1][i], Q[2][i]]); // q.T rows
+    for (let i = 0; i < 3; i++) { le[i] += Math.log(Math.abs(R[i][i])); over[i][step] = le[i] / ((step + 1) * dt); }
+  }
+  return { exps: le.map(v => v / (numSteps * dt)), over };
+}
+
+if (typeof module !== 'undefined') module.exports = {};
+
+</script>
+<script id="jobs-src" type="text/plain">
+// Worker-side jobs (heavy figures). Each job posts {type:'progress'|'done', data}.
+'use strict';
+const X0 = [1.4324, 2.6837, 18.5043];
+const A = (a) => Array.from(a);
+const range1 = (n) => Array.from({ length: n }, (_, i) => i + 1);
+
+const JOBS = {
+  // Figure 4: metric entropy from forecasting error (t_end 400, dt 0.01)
+  fig4(p, post) {
+    const N = 40000 / (p.q || 1), END = 400 / (p.q || 1), dt = END / N, DEPTH = 100, PLATEAU = 60;
+    const r = integrateLorenz(p, X0, 0, END, N);
+    const [tr, te] = partitionData(r.y, 0.5, N);
+    let last = 0;
+    const res = calculateEntropy(tr, te, range1(DEPTH), p.k, dt, null, (i, x, y) => {
+      const now = Date.now();
+      if (now - last > 150 || i === DEPTH - 1) { last = now; post('progress', { x: A(x.subarray(0, i + 1)), y: y.map(A), frac: (i + 1) / DEPTH }); }
+    });
+    const rs = calculateRansacSlope(res.x, res.y, PLATEAU);
+    post('done', { x: A(res.x), y: res.y.map(A), slopes: rs.slopes, intercepts: rs.intercepts, masks: rs.masks.map(A), dt });
+  },
+
+  // Figure 4 inset + appendix figure: ensemble over sampling rates (t_end 400, K = steps/20, first 4 points)
+  ens(p, post) {
+    // Faithful to the notebook: integrate_system() ignores its arguments and always integrates the global
+    // 40000-step run (t_end 400); each ensemble member only changes the train/test split, K and the dt used for x.
+    const END = 400, NS = 40000, DEPTH = 4;
+    const r = integrateLorenz(p, X0, 0, END, NS);
+    const steps = Array.from(linspace(500, 40000, 20), v => Math.trunc(v)).slice(0, p.q ? 4 : 20);
+    const out = [];
+    for (let i = 0; i < steps.length; i++) {
+      const ns = steps[i], K = Math.trunc(ns / 20), dt = END / ns;
+      const [tr, te] = partitionData(r.y, 0.5, ns);
+      const res = calculateEntropyStreaming(tr, te, range1(DEPTH), K, dt);
+      out.push({ h: res.h, c: res.h.map(v => v * dt) });
+      post(i === steps.length - 1 ? 'done' : 'progress', { steps: steps.slice(0, i + 1), h: out.map(o => o.h), c: out.map(o => o.c), frac: (i + 1) / steps.length });
+    }
+  },
+
+  // Figure 5: metric entropy vs noise fraction
+  fig5(p, post) {
+    // the notebook's noise sweep runs on the same 10000-step (t_end 100) series as Figures 7 and 8
+    const N = 10000 / (p.q || 1), END = 100 / (p.q || 1), dt = END / N, DEPTH = 30, PLATEAU = 20;
+    const NF = A(linspace(0, 1, p.q ? 8 : 50));
+    const r = integrateLorenz(p, X0, 0, END, N);
+    const [tr, te] = partitionData(r.y, 0.5, N);
+    const rg = ranges(r.y);
+    const rnd = makeNormal(p.seed || 11);
+    const h = [];
+    for (let i = 0; i < NF.length; i++) {
+      const lv = rg.map(v => v * NF[i]);
+      const ntr = addNoise(tr, lv, rnd), nte = addNoise(te, lv, rnd);
+      const res = calculateEntropy(ntr, nte, range1(DEPTH), p.k, dt);
+      const rs = calculateRansacSlope(res.x, res.y, PLATEAU);
+      h.push(rs.slopes.map(s => s / 2));
+      post('progress', { nf: NF.slice(0, i + 1), h, frac: (i + 1) / NF.length, dt });
+    }
+    // np.polyfit(NOISE_FRACTIONS, np.log(np.clip(h, 1e-5, None)), 1)
+    const fits = [0, 1, 2].map(j => polyfit1(NF, h.map(r => Math.log(Math.max(r[j], 1e-5)))));
+    post('done', { nf: NF, h, fits, dt, frac: 1 });
+  },
+
+  // Figure 6 (right): Lyapunov spectrum
+  lyap(p, post) {
+    const r = calculateLyapunov(p, X0, p.q ? 200 : 1000, 0.01);
+    post('done', { exps: r.exps, over: r.over.map(A) });
+  },
+
+  // Figure 7: optimal embedding parameters (self mutual information + Cao's method), a = 0 and a = noise
+  fig7(p, post) {
+    const N = 10000 / (p.q || 1), END = 100 / (p.q || 1), NTAU = 100, MMAX = 10, W = 100;
+    const r = integrateLorenz(p, X0, 0, END, N);
+    const out = { frac: 0 };
+    const send = (f) => { out.frac = f; post('progress', out); };
+    const smi = calcSmiMinProgress(r.y[0], NTAU, 3, (s, f) => { out.smi = s; send(f * 0.4); });
+    out.smi = { smi: A(smi.smi), ind: smi.ind }; send(0.42);
+    const cao = calcMinM(r.y[0], smi.ind, MMAX, W);
+    out.cao = { E1: A(cao.E1), E2: A(cao.E2) }; send(0.5);
+    const rnd = makeNormal(p.seed || 5);
+    const noisy = addNoise(r.y, ranges(r.y).map(v => v * p.a), rnd);
+    const smiN = calcSmiMinProgress(noisy[0], NTAU, 4, (s, f) => { out.smiN = s; send(0.5 + f * 0.4); });
+    out.smiN = { smi: A(smiN.smi), ind: smiN.ind }; send(0.92);
+    const caoN = calcMinM(noisy[0], smiN.ind, MMAX, W);
+    out.caoN = { E1: A(caoN.E1), E2: A(caoN.E2) };
+    post('done', Object.assign(out, { frac: 1 }));
+  },
+
+  // Figure 8: metric entropy of the embedding, a = 0 and a = noise
+  fig8(p, post) {
+    // same series as Figure 7 (the notebook reuses `results` from the embedding-parameter cells)
+    const N = 10000 / (p.q || 1), END = 100 / (p.q || 1), dt = END / N, PLATEAU = 50, DEPTH = 100;
+    const r = integrateLorenz(p, X0, 0, END, N);
+    const run = (series, tau) => {
+      const emb = embed(series, tau, p.m);
+      const [tr, te] = partitionData(emb, 0.5, N);
+      const res = calculateEntropy(tr, te, range1(DEPTH), p.k, dt);
+      const rs = calculateRansacSlope(res.x, res.y, PLATEAU);
+      return { x: A(res.x), y: res.y.map(A), slopes: rs.slopes, intercepts: rs.intercepts, masks: rs.masks.map(A) };
+    };
+    const out = { dt };
+    out.clean = run(r.y[0], p.tau); out.frac = 0.5; post('progress', out);
+    const rnd = makeNormal(p.seed || 5);
+    const noisy = addNoise(r.y, ranges(r.y).map(v => v * p.a), rnd);
+    out.noisy = run(noisy[0], p.tauN); out.frac = 1;
+    post('done', out);
+  },
+};
+
+function calcSmiMinProgress(x, nTau, seed, cb) {
+  const rnd = makeNormal(seed);
+  const smi = new Float64Array(nTau);
+  let last = 0;
+  for (let i = 0; i < nTau; i++) {
+    smi[i] = i === 0 ? mutualInfoKSG(x, x, rnd) : mutualInfoKSG(x.subarray(i), x.subarray(0, x.length - i), rnd);
+    const now = Date.now();
+    if (now - last > 200) { last = now; cb({ smi: A(smi.subarray(0, i + 1)), ind: -1 }, (i + 1) / nTau); }
+  }
+  const inc = []; for (let i = 0; i < nTau - 1; i++) if (smi[i + 1] - smi[i] >= 0) inc.push(i);
+  return { smi, ind: inc.length > 2 ? inc[2] : (inc.length ? inc[inc.length - 1] : 0) };
+}
+
+self.onmessage = (e) => {
+  const { job, params } = e.data;
+  JOBS[job](params, (type, data) => self.postMessage({ type, data }));
+};
+
+</script>
+<script>
+// Minimal matplotlib look-alike renderer (SVG) used to redraw the report's figures exactly as designed.
+'use strict';
+
+/* ---------- colours ---------- */
+const PURPLES = ['#fcfbfd', '#efedf5', '#dadaeb', '#bcbddc', '#9e9ac8', '#807dba', '#6a51a3', '#54278f', '#3f007d'];
+function hex2rgb(h) { return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); }
+function Purples(v) {
+  v = Math.min(1, Math.max(0, v)); const s = v * 8, i = Math.min(7, Math.floor(s)), f = s - i;
+  const a = hex2rgb(PURPLES[i]), b = hex2rgb(PURPLES[i + 1]);
+  return 'rgb(' + a.map((x, k) => Math.round(x + (b[k] - x) * f)).join(',') + ')';
+}
+const CYCLE = [0.9, 0.74, 0.58, 0.42, 0.26, 0.1].map(Purples);
+
+/* ---------- text measurement + mathtext ---------- */
+const _mctx = document.createElement('canvas').getContext('2d');
+function fontCSS(size, family, italic, bold) { return `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${size}px ${family}`; }
+function measure(t, size, family, italic, bold) { _mctx.font = fontCSS(size, family, italic, bold); return _mctx.measureText(t).width; }
+
+const MATHSYM = { tau: 'τ', lambda: 'λ', sigma: 'σ', rho: 'ρ', beta: 'β', alpha: 'α', delta: 'δ', mu: 'μ', times: '×', cdot: '·' };
+// parse "plain $math$ plain" into runs {t, it, bf, lvl}
+function parseMath(str) {
+  const runs = [];
+  const parts = String(str).split('$');
+  parts.forEach((p, i) => {
+    if (i % 2 === 0) { if (p) runs.push({ t: p, it: false, bf: false, lvl: 0 }); return; }
+    let pos = 0;
+    function group(lvl, it, bf) {
+      // parse until '}' or end
+      while (pos < p.length) {
+        const c = p[pos];
+        if (c === '}') { pos++; return; }
+        if (c === '{') { pos++; group(lvl, it, bf); continue; }
+        if (c === '_' || c === '^') {
+          pos++; const nl = lvl + (c === '^' ? 1 : -1);
+          if (p[pos] === '{') { pos++; group(nl, it, bf); } else atom(nl, it, bf);
+          continue;
+        }
+        atom(lvl, it, bf);
+      }
+    }
+    function atom(lvl, it, bf) {
+      const c = p[pos];
+      if (c === '\\') {
+        let m = /^\\([a-zA-Z]+)/.exec(p.slice(pos));
+        if (!m) { pos += 2; return; }
+        const cmd = m[1]; pos += m[0].length;
+        if (cmd === 'text' || cmd === 'mathrm') { pos++; group(lvl, false, bf); return; }
+        if (cmd === 'mathbf') { pos++; group(lvl, false, true); return; }
+        if (cmd === 'tilde') {
+          let inner; if (p[pos] === '{') { const e = p.indexOf('}', pos); inner = p.slice(pos + 1, e); pos = e + 1; } else { inner = p[pos]; pos++; }
+          runs.push({ t: inner + '̃', it: true, bf, lvl }); return;
+        }
+        runs.push({ t: MATHSYM[cmd] || cmd, it: true, bf, lvl }); return;
+      }
+      pos++;
+      if (c === ' ') return;
+      if (/[A-Za-z]/.test(c)) runs.push({ t: c, it, bf, lvl });
+      else if (c === '=' ) runs.push({ t: ' = ', it: false, bf, lvl });
+      else if (c === '-') runs.push({ t: '−', it: false, bf, lvl });
+      else if (c === '*') runs.push({ t: '∗', it: false, bf, lvl });
+      else runs.push({ t: c, it: false, bf, lvl });
+    }
+    group(0, true, false);
+  });
+  return runs;
+}
+function layoutText(str, size, family, bold) {
+  const runs = parseMath(str);
+  let x = 0; const out = [];
+  for (const r of runs) {
+    const s = r.lvl === 0 ? size : size * 0.7;
+    const dy = r.lvl > 0 ? -size * 0.36 : r.lvl < 0 ? size * 0.2 : 0;
+    const w = measure(r.t, s, family, r.it, bold || r.bf);
+    out.push({ t: r.t, x, dy, s, it: r.it, bf: bold || r.bf }); x += w;
+  }
+  return { runs: out, w: x };
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+// draw text: ha left|center|right, va baseline|center|top|bottom, rot degrees (90 = vertical up)
+function svgText(x, y, str, o) {
+  const size = o.size, fam = o.family;
+  const L = layoutText(str, size, fam, o.bold);
+  let x0 = 0; if (o.ha === 'center') x0 = -L.w / 2; else if (o.ha === 'right') x0 = -L.w;
+  let yb = 0; // baseline offset
+  const asc = size * 0.72, desc = size * 0.22;
+  if (o.va === 'center') yb = (asc - desc) / 2; else if (o.va === 'top') yb = asc; else if (o.va === 'bottom') yb = -desc;
+  else if (o.va === 'center_baseline') yb = asc / 2;
+  let s = '';
+  for (const r of L.runs) {
+    s += `<text style="white-space:pre" x="${(x0 + r.x).toFixed(2)}" y="${(yb + r.dy).toFixed(2)}" font-size="${r.s.toFixed(2)}"${r.it ? ' font-style="italic"' : ''}${r.bf ? ' font-weight="bold"' : ''}>${esc(r.t)}</text>`;
+  }
+  const tr = `translate(${x.toFixed(2)},${y.toFixed(2)})` + (o.rot ? ` rotate(${-o.rot})` : '');
+  return `<g transform="${tr}" font-family='${fam}' fill="${o.color || '#000'}"${o.alpha != null ? ` fill-opacity="${o.alpha}"` : ''}>${s}</g>`;
+}
+
+/* ---------- tick helpers ---------- */
+function maxNLocator(vmin, vmax, nbins) {
+  if (!(vmax > vmin)) { vmax = vmin + 1; }
+  const steps = [1, 2, 2.5, 5, 10];
+  const raw = (vmax - vmin) / nbins;
+  const scale = Math.pow(10, Math.floor(Math.log10(raw)));
+  let istep = steps.findIndex(s => s * scale >= raw * (1 - 1e-12)); if (istep < 0) istep = steps.length - 1;
+  // like matplotlib: try the chosen step, then progressively smaller ones until >= 2 ticks are visible
+  const cands = steps.slice(0, istep + 1).reverse().map(s => s * scale).concat(steps.slice(0, -1).reverse().map(s => s * scale / 10));
+  let ticks = [];
+  for (const step of cands) {
+    const lo = Math.floor(vmin / step + 1e-9), hi = Math.ceil(vmax / step - 1e-9);
+    ticks = []; for (let i = lo; i <= hi; i++) ticks.push(+(i * step).toPrecision(12));
+    const vis = ticks.filter(t => t >= vmin - 1e-9 * step && t <= vmax + 1e-9 * step);
+    if (vis.length >= 2) return vis;
+  }
+  return [vmin, vmax];
+}
+function formatTicks(locs) {
+  let dec = 0;
+  for (; dec < 8; dec++) if (locs.every(v => Math.abs(+v.toFixed(dec) - v) < 1e-9 * Math.max(1, Math.abs(v)))) break;
+  return locs.map(v => { let s = (Math.abs(v) < 1e-12 ? 0 : v).toFixed(dec); return s.replace('-', '−'); });
+}
+
+/* ---------- Figure / Axes ---------- */
+class Fig {
+  constructor(W, H, dpi = 300, family = "'Source Sans 3', 'Source Sans Pro', sans-serif") {
+    this.W = W; this.H = H; this.dpi = dpi; this.family = family; this.axes = []; this.extra = [];
+    this.fs = 8; // rc font size (pt)
+  }
+  pt(v) { return v * this.dpi / 72; }
+  addAxes(x0, y0, x1, y1) { const a = new Axes(this, x0, y0, x1, y1); this.axes.push(a); return a; }
+  toSVG() {
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${this.W} ${this.H}" width="100%" style="display:block">`;
+    s += `<rect width="${this.W}" height="${this.H}" fill="#fff"/>`;
+    this.axes.forEach((a, i) => { s += a.render(i); });
+    s += this.extra.join('');
+    return s + '</svg>';
+  }
+}
+let _clipId = 0;
+class Axes {
+  constructor(fig, x0, y0, x1, y1) {
+    Object.assign(this, { fig, x0, y0, x1, y1 });
+    this.lines = []; this.spans = []; this.texts = []; this.o = { xlog: false, ylog: false, xticklabels: true, yticklabels: true };
+    this.leg = null; this.marginX = 0.05; this.marginY = 0.05;
+  }
+  plot(x, y, o = {}) { this.lines.push({ x, y, o }); return this; }
+  axvspan(a, b, o = {}) { this.spans.push({ k: 'v', a, b, o }); return this; }
+  axhspan(a, b, o = {}) { this.spans.push({ k: 'h', a, b, o }); return this; }
+  hlines(y, a, b, o = {}) { this.lines.push({ x: [a, b], y: [y, y], o: Object.assign({ lw: 1.5 }, o), noscale: false }); return this; }
+  axvline(x, o = {}) { this.spans.push({ k: 'vl', a: x, o }); return this; }
+  text(x, y, s, o = {}) { this.texts.push({ x, y, s, o }); return this; }
+  set(o) { Object.assign(this.o, o); return this; }
+  legend(o = {}) { this.leg = o; return this; }
+  _limits() {
+    const lim = (axis) => {
+      const log = axis === 'x' ? this.o.xlog : this.o.ylog;
+      const set = axis === 'x' ? this.o.xlim : this.o.ylim;
+      let mn = Infinity, mx = -Infinity;
+      for (const L of this.lines) {
+        if (L.o.noscale) continue;
+        const arr = axis === 'x' ? L.x : L.y;
+        for (let i = 0; i < arr.length; i++) { const v = arr[i]; if (!isFinite(v) || (log && v <= 0)) continue; if (v < mn) mn = v; if (v > mx) mx = v; }
+      }
+      for (const S of this.spans) if (S.k === 'vl' && axis === 'x') { mn = Math.min(mn, S.a); mx = Math.max(mx, S.a); }
+      if (!isFinite(mn)) { mn = log ? 0.1 : 0; mx = log ? 1 : 1; }
+      if (mn === mx) { if (log) { mn /= 10; mx *= 10; } else { mn -= 0.5; mx += 0.5; } }
+      const m = axis === 'x' ? this.marginX : this.marginY;
+      let a, b;
+      if (log) { const la = Math.log10(mn), lb = Math.log10(mx), d = (lb - la) * m; a = Math.pow(10, la - d); b = Math.pow(10, lb + d); }
+      else { const d = (mx - mn) * m; a = mn - d; b = mx + d; }
+      if (set) { if (set[0] != null) a = set[0]; if (set[1] != null) b = set[1]; }
+      return [a, b];
+    };
+    this.xl = lim('x'); this.yl = lim('y');
+  }
+  X(v) { const [a, b] = this.xl; if (this.o.xlog) return this.x0 + (Math.log10(v) - Math.log10(a)) / (Math.log10(b) - Math.log10(a)) * (this.x1 - this.x0); return this.x0 + (v - a) / (b - a) * (this.x1 - this.x0); }
+  Y(v) { const [a, b] = this.yl; if (this.o.ylog) return this.y1 - (Math.log10(v) - Math.log10(a)) / (Math.log10(b) - Math.log10(a)) * (this.y1 - this.y0); return this.y1 - (v - a) / (b - a) * (this.y1 - this.y0); }
+  _ticks(axis) {
+    const f = this.fig, log = axis === 'x' ? this.o.xlog : this.o.ylog;
+    const [a, b] = axis === 'x' ? this.xl : this.yl;
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    if (log) {
+      const major = [], minor = [];
+      for (let e = Math.floor(Math.log10(lo)) - 1; e <= Math.ceil(Math.log10(hi)) + 1; e++) {
+        const v = Math.pow(10, e); if (v >= lo * (1 - 1e-9) && v <= hi * (1 + 1e-9)) major.push(v);
+        for (let s = 2; s <= 9; s++) { const m = s * v; if (m >= lo && m <= hi) minor.push(m); }
+      }
+      return { major, minor, labels: major.map(v => `$10^{${Math.round(Math.log10(v))}}$`) };
+    }
+    const lenPt = (axis === 'x' ? (this.x1 - this.x0) : (this.y1 - this.y0)) * 72 / f.dpi;
+    const space = Math.floor(lenPt / (f.fs * (axis === 'x' ? 3 : 2)));
+    const nb = Math.max(1, Math.min(9, space));
+    const major = this.o[axis + 'ticks'] || maxNLocator(lo, hi, nb);
+    return { major, minor: [], labels: formatTicks(major) };
+  }
+  render(index) {
+    this._limits();
+    const f = this.fig, P = v => f.pt(v), fam = f.family, fs = P(f.fs);
+    const cid = 'c' + (++_clipId);
+    let s = `<defs><clipPath id="${cid}"><rect x="${this.x0}" y="${this.y0}" width="${this.x1 - this.x0}" height="${this.y1 - this.y0}"/></clipPath></defs>`;
+    let body = '';
+    // spans
+    for (const S of this.spans) {
+      const col = S.o.color || '#808080', al = S.o.alpha == null ? 1 : S.o.alpha;
+      if (S.k === 'v') { const xa = this.X(S.a), xb = this.X(S.b); body += `<rect x="${Math.min(xa, xb)}" y="${this.y0}" width="${Math.abs(xb - xa)}" height="${this.y1 - this.y0}" fill="${col}" fill-opacity="${al}"/>`; }
+      else if (S.k === 'h') { const ya = this.Y(S.a), yb = this.Y(S.b); body += `<rect x="${this.x0}" y="${Math.min(ya, yb)}" width="${this.x1 - this.x0}" height="${Math.abs(yb - ya)}" fill="${col}" fill-opacity="${al}"/>`; }
+    }
+    // lines
+    const all = this.lines.concat(this.spans.filter(S => S.k === 'vl').map(S => ({ vline: S })));
+    for (const L of all) {
+      if (L.vline) { const S = L.vline, x = this.X(S.a); body += `<line x1="${x}" x2="${x}" y1="${this.y0}" y2="${this.y1}" ${strokeAttrs(S.o, f)}/>`; continue; }
+      body += this._lineSVG(L);
+    }
+    // texts (data/axes coords) -- drawn unclipped, like matplotlib
+    let txt = '';
+    for (const T of this.texts) {
+      const tx = T.o.transform === 'axes' ? this.x0 + T.x * (this.x1 - this.x0) : this.X(T.x);
+      const ty = T.o.transform === 'axes' ? this.y1 - T.y * (this.y1 - this.y0) : this.Y(T.y);
+      txt += svgText(tx, ty, T.s, { size: P(T.o.size || f.fs), family: fam, ha: T.o.ha || 'left', va: T.o.va || 'baseline', bold: T.o.weight === 'bold', color: T.o.color });
+    }
+    s += `<g clip-path="url(#${cid})">${body}</g>`;
+    // spines
+    const sw = P(0.8);
+    s += `<rect x="${this.x0}" y="${this.y0}" width="${this.x1 - this.x0}" height="${this.y1 - this.y0}" fill="none" stroke="#000" stroke-width="${sw}"/>`;
+    // ticks
+    const tl = P(3.5), tlm = P(2), pad = P(3.5);
+    let maxYLabelW = 0, xLabelH = 0;
+    const xt = this._ticks('x'), yt = this._ticks('y');
+    xt.major.forEach((v, i) => {
+      const x = this.X(v); if (x < this.x0 - 1 || x > this.x1 + 1) return;
+      s += `<line x1="${x}" x2="${x}" y1="${this.y1}" y2="${this.y1 + tl}" stroke="#000" stroke-width="${sw}"/>`;
+      if (this.o.xticklabels) s += svgText(x, this.y1 + tl + pad, xt.labels[i], { size: fs, family: fam, ha: 'center', va: 'top' });
+    });
+    xt.minor.forEach(v => { const x = this.X(v); s += `<line x1="${x}" x2="${x}" y1="${this.y1}" y2="${this.y1 + tlm}" stroke="#000" stroke-width="${P(0.6)}"/>`; });
+    if (this.o.xticklabels) xLabelH = fs * (this.o.xlog ? 1.25 : 0.95);
+    yt.major.forEach((v, i) => {
+      const y = this.Y(v); if (y < this.y0 - 1 || y > this.y1 + 1) return;
+      s += `<line x1="${this.x0 - tl}" x2="${this.x0}" y1="${y}" y2="${y}" stroke="#000" stroke-width="${sw}"/>`;
+      if (this.o.yticklabels) { s += svgText(this.x0 - tl - pad, y, yt.labels[i], { size: fs, family: fam, ha: 'right', va: 'center_baseline' }); maxYLabelW = Math.max(maxYLabelW, layoutText(yt.labels[i], fs, fam).w); }
+    });
+    yt.minor.forEach(v => { const y = this.Y(v); s += `<line x1="${this.x0 - tlm}" x2="${this.x0}" y1="${y}" y2="${y}" stroke="#000" stroke-width="${P(0.6)}"/>`; });
+    // labels
+    const lp = P(4);
+    if (this.o.xlabel) s += svgText((this.x0 + this.x1) / 2, this.y1 + tl + (this.o.xticklabels ? pad + xLabelH : 0) + lp, this.o.xlabel, { size: P(this.o.xlabelsize || f.fs), family: fam, ha: 'center', va: 'top' });
+    if (this.o.ylabel) s += svgText(this.x0 - tl - (this.o.yticklabels ? pad + maxYLabelW : 0) - lp, (this.y0 + this.y1) / 2, this.o.ylabel, { size: P(this.o.ylabelsize || f.fs), family: fam, ha: 'center', va: 'bottom', rot: this.o.ylabelrot == null ? 90 : this.o.ylabelrot });
+    if (this.o.title) s += svgText((this.x0 + this.x1) / 2, this.y0 - P(6), this.o.title, { size: P(f.fs * 1.2), family: fam, ha: 'center', va: 'baseline' });
+    s += txt;
+    if (this.leg) s += this._legendSVG();
+    return s;
+  }
+  _lineSVG(L) {
+    const f = this.fig, o = L.o; let s = '';
+    const ls = o.ls == null ? '-' : o.ls;
+    if (ls !== 'none' && ls !== '') {
+      let d = '', pen = false;
+      const n = L.x.length;
+      for (let i = 0; i < n; i++) {
+        const xv = L.x[i], yv = L.y[i];
+        if (!isFinite(xv) || !isFinite(yv) || (this.o.ylog && yv <= 0)) { pen = false; continue; }
+        const px = this.X(xv), py = this.Y(yv);
+        d += (pen ? 'L' : 'M') + px.toFixed(1) + ' ' + py.toFixed(1); pen = true;
+      }
+      if (d) s += `<path d="${d}" fill="none" ${strokeAttrs(o, f)} stroke-linejoin="round" stroke-linecap="${ls === '-' ? 'square' : 'butt'}"/>`;
+    }
+    if (o.marker) for (let i = 0; i < L.x.length; i++) {
+      if (!isFinite(L.x[i]) || !isFinite(L.y[i])) continue;
+      s += markerSVG(o.marker, this.X(L.x[i]), this.Y(L.y[i]), o, f);
+    }
+    return s;
+  }
+  _legendSVG() {
+    const f = this.fig, P = v => f.pt(v), o = this.leg, fsz = P(o.fontsize || f.fs), fam = f.family;
+    const entries = this.lines.filter(L => L.o.label && !String(L.o.label).startsWith('_'))
+      .concat(this.spans.filter(S => S.k === 'vl' && S.o.label).map(S => ({ o: Object.assign({ ls: S.o.ls }, S.o), vline: true })));
+    if (o.order) entries.sort((a, b) => o.order.indexOf(a.o.label) - o.order.indexOf(b.o.label));
+    if (!entries.length) return '';
+    const ncol = o.ncol || 1, nrow = Math.ceil(entries.length / ncol);
+    const hl = (o.handlelength == null ? 2 : o.handlelength) * fsz, htp = (o.handletextpad == null ? 0.8 : o.handletextpad) * fsz;
+    const lsp = (o.labelspacing == null ? 0.5 : o.labelspacing) * fsz, bp = (o.borderpad == null ? 0.4 : o.borderpad) * fsz;
+    const csp = (o.columnspacing == null ? 2 : o.columnspacing) * fsz, bap = 0.5 * fsz;
+    const rowH = Math.max(...entries.map(e => fsz * (/[_^]/.test(e.o.label) ? 1.08 : 0.93)));
+    const cols = [];
+    for (let c = 0; c < ncol; c++) cols.push(entries.slice(c * nrow, (c + 1) * nrow));
+    const colW = cols.map(col => Math.max(0, ...col.map(e => hl + htp + layoutText(e.o.label, fsz, fam).w)));
+    const W = colW.reduce((a, b) => a + b, 0) + csp * (ncol - 1) + 2 * bp;
+    const H = nrow * rowH + (nrow - 1) * lsp + 2 * bp;
+    const loc = o.loc || 'upper right';
+    let ax, ay; // anchor point in px & alignment
+    const bb = o.bbox || null; // [x, y] in axes coords
+    const AX = v => this.x0 + v * (this.x1 - this.x0), AY = v => this.y1 - v * (this.y1 - this.y0);
+    let lx, ly;
+    if (bb) {
+      const px = AX(bb[0]), py = AY(bb[1]);
+      lx = loc.includes('right') ? px - W - bap : loc.includes('left') ? px + bap : px - W / 2;
+      ly = loc.includes('upper') ? py + bap : loc.includes('lower') ? py - H - bap : py - H / 2;
+    } else {
+      lx = loc.includes('right') ? this.x1 - bap - W : loc.includes('left') ? this.x0 + bap : (this.x0 + this.x1) / 2 - W / 2;
+      ly = loc.includes('upper') ? this.y0 + bap : loc.includes('lower') ? this.y1 - bap - H : (this.y0 + this.y1) / 2 - H / 2;
+    }
+    let s = '';
+    if (o.frameon !== false) {
+      s += `<rect x="${lx}" y="${ly}" width="${W}" height="${H}" rx="${P(2)}" fill="${o.facecolor || '#fff'}" fill-opacity="${o.framealpha == null ? 0.8 : o.framealpha}" stroke="${o.edgecolor || '#ccc'}" stroke-opacity="0.8" stroke-width="${o.edgewidth == null ? P(1) : o.edgewidth}"/>`;
+    }
+    let cx = lx + bp;
+    cols.forEach((col, ci) => {
+      col.forEach((e, ri) => {
+        const cy = ly + bp + ri * (rowH + lsp) + rowH / 2;
+        const lo = e.o;
+        const ls = lo.ls == null ? '-' : lo.ls;
+        if (ls !== 'none' && ls !== '') s += `<line x1="${cx}" x2="${cx + hl}" y1="${cy}" y2="${cy}" ${strokeAttrs(lo, f)}/>`;
+        if (lo.marker) s += markerSVG(lo.marker, cx + hl / 2, cy, lo, f);
+        s += svgText(cx + hl + htp, cy, lo.label, { size: fsz, family: fam, ha: 'left', va: 'center_baseline' });
+      });
+      cx += colW[ci] + csp;
+    });
+    return s;
+  }
+}
+function strokeAttrs(o, f) {
+  const lw = f.pt(o.lw == null ? 1.5 : o.lw);
+  let s = `stroke="${o.color || '#000'}" stroke-width="${lw.toFixed(2)}"`;
+  if (o.alpha != null) s += ` stroke-opacity="${o.alpha}"`;
+  const ls = o.ls == null ? '-' : o.ls;
+  const w = o.lw == null ? 1.5 : o.lw;
+  if (ls === '--') s += ` stroke-dasharray="${f.pt(3.7 * w).toFixed(1)} ${f.pt(1.6 * w).toFixed(1)}"`;
+  else if (ls === ':') s += ` stroke-dasharray="${f.pt(1 * w).toFixed(1)} ${f.pt(1.65 * w).toFixed(1)}"`;
+  return s;
+}
+function markerSVG(m, x, y, o, f) {
+  const ms = f.pt(o.ms || 6), r = ms / 2, col = o.mcolor || o.color || '#000';
+  const al = o.alpha != null ? ` fill-opacity="${o.alpha}" stroke-opacity="${o.alpha}"` : '';
+  const ew = f.pt(o.mew || 1);
+  if (m === 's') return `<rect x="${x - r}" y="${y - r}" width="${ms}" height="${ms}" fill="${col}"${al}/>`;
+  if (m === 'o') return `<circle cx="${x}" cy="${y}" r="${r}" fill="${col}"${al}/>`;
+  if (m === '^') return `<path d="M${x} ${y - r}L${x + r} ${y + r}L${x - r} ${y + r}Z" fill="${col}"${al}/>`;
+  if (m === 'x') return `<path d="M${x - r} ${y - r}L${x + r} ${y + r}M${x - r} ${y + r}L${x + r} ${y - r}" stroke="${col}" stroke-width="${ew * 1.5}"${al}/>`;
+  return '';
+}
+
+'use strict';
+const X0 = [1.4324, 2.6837, 18.5043];
+const LABELS = ['x', 'y', 'z'];
+const G = { sigma: 10, rho: 28, beta: 8 / 3 };
+const ST = {
+  fig1: { azim: -60, elev: 30 },
+  fig2: { t: 10.05, k: 5, tfc: 0.5 },
+  fig3: { k: 10, fc: 1 },
+  fig4: { k: 200 },
+  fig5: { k: 100 },
+  fig6: { seed: 0 },
+  fig7: { a: 0.05 },
+  fig8: { tau: 18, tauN: 23, m: 4, k: 100, touched: false },
+};
+const RES = {}; // worker results
+const $ = (id) => document.getElementById(id);
+const range = (a, b) => { const r = []; for (let i = a; i < b; i++) r.push(i); return r; };
+const fmt = (v, d) => v.toFixed(d).replace('-', '−');
+const pyfmt = (v, d) => (Object.is(+v.toFixed(d), -0) || (v < 0 && +v.toFixed(d) === 0) ? '-' : '') + Math.abs(v).toFixed(d).replace(/^-/, '');
+function sval(v, d) { const s = v.toFixed(d); return s === '-' + (0).toFixed(d) ? s : s; } // python-style "%.2f" keeps "-0.00"
+
+/* ---------------- controls ---------------- */
+function slider(host, sym, min, max, step, get, set, onInput, onChange, dec) {
+  const wrap = document.createElement('label'); wrap.className = 'ctl';
+  const s = document.createElement('span'); s.className = 'sym'; s.innerHTML = sym;
+  const r = document.createElement('input'); r.type = 'range'; r.min = min; r.max = max; r.step = step; r.value = get();
+  const v = document.createElement('span'); v.className = 'val';
+  const show = () => { v.textContent = (+r.value).toFixed(dec); };
+  show();
+  r.addEventListener('input', () => { set(+r.value); show(); onInput && onInput(); });
+  r.addEventListener('change', () => { onChange && onChange(); });
+  wrap.append(s, r, v); host.append(wrap);
+  return { el: r, refresh: () => { r.value = get(); show(); } };
+}
+function progress(id, f) { const b = $(id + '-p'); if (!b) return; b.style.width = (100 * f) + '%'; b.parentNode.style.opacity = f >= 1 ? 0 : 1; }
+
+/* ---------------- workers ---------------- */
+const WSRC = () => $('core-src').textContent + '\n' + $('jobs-src').textContent;
+let WURL = null;
+const workers = {};
+const SYNC = /[?&]sync/.test(location.search);
+function runJob(name, params, onMsg) {
+  if (SYNC) { params.q = +(new URLSearchParams(location.search).get('q') || 0) || undefined; window.JOBS = window.JOBS || (0, eval)($('jobs-src').textContent + '\n;JOBS'); const msgs = []; JOBS[name](params, (type, data) => msgs.push({ type, data: JSON.parse(JSON.stringify(data)) })); const last = msgs[msgs.length - 1]; if (last) onMsg(last); return; }
+  if (!WURL) WURL = URL.createObjectURL(new Blob([WSRC()], { type: 'text/javascript' }));
+  if (workers[name]) workers[name].terminate();
+  const w = new Worker(WURL); workers[name] = w;
+  w.onmessage = (e) => onMsg(e.data);
+  w.onerror = (e) => console.error('worker ' + name + ': ' + e.message);
+  w.postMessage({ job: name, params });
+}
+const debounced = {};
+function later(name, fn, ms = 200) { clearTimeout(debounced[name]); debounced[name] = setTimeout(fn, ms); }
+
+/* ================= Figure 1: Lorenz attractor ================= */
+let F1 = null;
+function computeFig1() { F1 = integrateLorenz(G, X0, 0, 20, 1000); }
+function drawFig1() {
+  const fam = "'DejaVu Sans', Verdana, 'Bitstream Vera Sans', sans-serif";
+  const fig = new Fig(550, 800, 100, fam);
+  const r = F1, cols = [Purples(0.9), Purples(0.7), Purples(0.5)];
+  const axs = [[56, 437, 538, 531], [56, 548, 538, 642], [56, 659, 538, 753]].map(b => fig.addAxes(...b));
+  axs.forEach((ax, i) => {
+    ax.plot(r.t, r.y[i], { color: cols[i], label: LABELS[i] });
+    ax.set({ ylabel: `$\\mathbf{${LABELS[i]}}$`, xticklabels: i === 2 });
+  });
+  axs[2].set({ xlabel: 'Time' });
+  // shared x
+  axs.forEach(a => a._limits()); const xl = axs[0].xl; axs.forEach(a => a.set({ xlim: xl }));
+  fig.extra.push(draw3D(fig, r, ST.fig1.azim, ST.fig1.elev, fam));
+  $('fig1').innerHTML = fig.toSVG();
+}
+function niceLim(mn, mx) { const t = maxNLocator(mn, mx, 5); return t; }
+function draw3D(fig, r, azim, elev, fam) {
+  const P = v => fig.pt(v);
+  const ext = r.y.map(c => { let a = Infinity, b = -Infinity; for (const v of c) { if (v < a) a = v; if (v > b) b = v; } const pad = (b - a) / 48; return [a - pad, b + pad]; });
+  const asp = [4, 4, 3].map(v => v / 4);
+  const N = (i, v) => ((v - ext[i][0]) / (ext[i][1] - ext[i][0]) - 0.5) * asp[i] * 2; // normalised coords
+  const az = azim * Math.PI / 180, el = elev * Math.PI / 180;
+  const eye = [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)];
+  const right = [-Math.sin(az), Math.cos(az), 0];
+  const up = [-Math.sin(el) * Math.cos(az), -Math.sin(el) * Math.sin(az), Math.cos(el)];
+  const D = 9;
+  const proj0 = (p) => { const d = p[0] * eye[0] + p[1] * eye[1] + p[2] * eye[2]; const s = D / (D - d); return [s * (p[0] * right[0] + p[1] * right[1] + p[2] * right[2]), -s * (p[0] * up[0] + p[1] * up[1] + p[2] * up[2]), d]; };
+  // fit box corners into region
+  const corners = []; for (const a of [-1, 1]) for (const b of [-1, 1]) for (const c of [-1, 1]) corners.push(proj0([a * asp[0], b * asp[1], c * asp[2]]));
+  const bx = [Math.min(...corners.map(c => c[0])), Math.max(...corners.map(c => c[0]))], by = [Math.min(...corners.map(c => c[1])), Math.max(...corners.map(c => c[1]))];
+  const reg = [112, 40, 492, 398];
+  const sc = Math.min((reg[2] - reg[0]) / (bx[1] - bx[0]), (reg[3] - reg[1]) / (by[1] - by[0]));
+  const cx = (reg[0] + reg[2]) / 2 - sc * (bx[0] + bx[1]) / 2, cy = (reg[1] + reg[3]) / 2 - sc * (by[0] + by[1]) / 2;
+  const proj = (p) => { const q = proj0(p); return [cx + sc * q[0], cy + sc * q[1], q[2]]; };
+  const W = (x, y, z) => proj([N(0, x), N(1, y), N(2, z)]);
+  const lo = ext.map(e => e[0]), hi = ext.map(e => e[1]);
+  const ticks = ext.map(e => maxNLocator(e[0], e[1], 6));
+  let s = `<g font-family="${fam}">`;
+  // panes: for each axis, the pane farthest from the viewer
+  const paneAt = [eye[0] > 0 ? lo[0] : hi[0], eye[1] > 0 ? lo[1] : hi[1], eye[2] > 0 ? lo[2] : hi[2]];
+  const poly = (pts) => 'M' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L') + 'Z';
+  const pane = (ax) => {
+    const o = [0, 1, 2].filter(i => i !== ax), pts = [];
+    for (const [a, b] of [[0, 0], [1, 0], [1, 1], [0, 1]]) { const v = [0, 0, 0]; v[ax] = paneAt[ax]; v[o[0]] = a ? hi[o[0]] : lo[o[0]]; v[o[1]] = b ? hi[o[1]] : lo[o[1]]; pts.push(W(...v)); }
+    return pts;
+  };
+  for (let ax = 0; ax < 3; ax++) s += `<path d="${poly(pane(ax))}" fill="rgb(242,242,242)" fill-opacity="0.5" stroke="rgb(242,242,242)" stroke-width="${P(0.8)}"/>`;
+  // grid lines on panes
+  for (let ax = 0; ax < 3; ax++) {
+    const o = [0, 1, 2].filter(i => i !== ax);
+    for (const g of o) for (const tv of ticks[g]) {
+      if (tv < lo[g] || tv > hi[g]) continue;
+      const h = o.find(i => i !== g);
+      const a = [0, 0, 0], b = [0, 0, 0]; a[ax] = b[ax] = paneAt[ax]; a[g] = b[g] = tv; a[h] = lo[h]; b[h] = hi[h];
+      const pa = W(...a), pb = W(...b);
+      s += `<line x1="${pa[0]}" y1="${pa[1]}" x2="${pb[0]}" y2="${pb[1]}" stroke="#b0b0b0" stroke-width="${P(0.8)}"/>`;
+    }
+  }
+  // axis edges
+  const zEdge = eye[2] >= 0 ? lo[2] : hi[2];
+  const yNear = eye[1] < 0 ? lo[1] : hi[1], xNear = eye[0] > 0 ? hi[0] : lo[0];
+  const centre = W((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2);
+  // vertical z edge: leftmost on screen
+  let best = null; for (const xa of [lo[0], hi[0]]) for (const ya of [lo[1], hi[1]]) { const p = W(xa, ya, lo[2]); if (!best || p[0] < best.p[0]) best = { p, xa, ya }; }
+  const edges = [
+    { ax: 0, at: (v) => [v, yNear, zEdge] },
+    { ax: 1, at: (v) => [xNear, v, zEdge] },
+    { ax: 2, at: (v) => [best.xa, best.ya, v] },
+  ];
+  const fs = P(8);
+  for (const E of edges) {
+    const a = W(...E.at(lo[E.ax])), b = W(...E.at(hi[E.ax]));
+    s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#000" stroke-width="${P(0.8)}"/>`;
+    const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    let ox = mid[0] - centre[0], oy = mid[1] - centre[1];
+    // outward normal to the edge on screen
+    let ex = b[0] - a[0], ey = b[1] - a[1]; const el_ = Math.hypot(ex, ey) || 1; ex /= el_; ey /= el_;
+    let nx = -ey, ny = ex; if (nx * ox + ny * oy < 0) { nx = -nx; ny = -ny; }
+    for (const tv of ticks[E.ax]) {
+      if (tv < lo[E.ax] || tv > hi[E.ax]) continue;
+      const p = W(...E.at(tv));
+      s += `<line x1="${p[0]}" y1="${p[1]}" x2="${p[0] + nx * P(4)}" y2="${p[1] + ny * P(4)}" stroke="#000" stroke-width="${P(0.8)}"/>`;
+      s += svgText(p[0] + nx * P(13), p[1] + ny * P(13), formatTicks([tv])[0], { size: P(7), family: fam, ha: 'center', va: 'center' });
+    }
+    s += svgText(mid[0] + nx * P(30), mid[1] + ny * P(30), `$\\mathbf{${LABELS[E.ax]}}$`, { size: P(10), family: fam, ha: 'center', va: 'center' });
+  }
+  // the attractor (clipped to figure top area)
+  let d = '';
+  for (let i = 0; i < r.t.length; i++) { const p = W(r.y[0][i], r.y[1][i], r.y[2][i]); d += (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }
+  s += `<path d="${d}" fill="none" stroke="${CYCLE[0]}" stroke-width="${P(1.5)}" stroke-linejoin="round"/>`;
+  s += `<rect id="rot3d" x="0" y="0" width="550" height="425" fill="transparent" style="cursor:grab"/>`;
+  return s + '</g>';
+}
+function hookRotate() {
+  const host = $('fig1');
+  let drag = null;
+  host.addEventListener('pointerdown', (e) => {
+    if (!(e.target && e.target.id === 'rot3d')) return;
+    drag = { x: e.clientX, y: e.clientY, az: ST.fig1.azim, el: ST.fig1.elev }; host.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  host.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const k = 550 / host.getBoundingClientRect().width * 0.5;
+    ST.fig1.azim = drag.az - (e.clientX - drag.x) * k;
+    ST.fig1.elev = Math.max(-89, Math.min(89, drag.el + (e.clientY - drag.y) * k));
+    requestAnimationFrame(drawFig1);
+  });
+  const end = () => { drag = null; };
+  host.addEventListener('pointerup', end); host.addEventListener('pointercancel', end);
+}
+
+/* ================= Figure 2: nearest neighbour schematic ================= */
+let F2 = null;
+function computeFig2base() {
+  const N = 1000, r = integrateLorenz(G, X0, 0, 20, N);
+  const [tr] = partitionData(r.y, 0.5, N);
+  F2 = { r, tr, tree: new KDTree(tr, tr[0].length), dt: 20 / N, N };
+}
+function drawFig2() {
+  const { r, tr, tree, dt, N } = F2, S = ST.fig2;
+  const XMIN = 6, XMAX = 12, THRESH = 40;
+  const fcs = Math.trunc(S.tfc / dt + 1e-9);
+  const ti = Math.trunc(S.t / dt + 1e-9);
+  const end = Math.trunc(XMAX / dt + 1e-9);
+  const split = Math.trunc(N * 0.5);
+  const q = tree.queryAll(r.y.map(c => c.subarray(ti, ti + 1)), 1, S.k);
+  let nb = Array.from(q.nbrs);
+  const forecast = [0, 1, 2].map(i => nb.reduce((s, n) => s + r.y[i][n + fcs], 0) / nb.length);
+  const filt = []; for (const n of nb) if (filt.every(o => Math.abs(n - o) > THRESH)) filt.push(n);
+  nb = filt; const nf = nb.map(n => n + fcs);
+  const fig = new Fig(1505, 1207);
+  const axs = [[156, 30, 1460, 335], [156, 397, 1460, 702], [156, 763, 1460, 1069]].map(b => fig.addAxes(...b));
+  const P8 = Purples(0.8);
+  axs.forEach((ax, i) => {
+    const y = r.y[i];
+    ax.plot(r.t.subarray(0, end), y.subarray(0, end), { color: 'grey' });
+    ax.plot(nb.map(n => r.t[n]), nb.map(n => y[n]), { ls: 'none', marker: 's', color: 'black', label: 'Nearest Neighbours' });
+    ax.plot(nf.map(n => r.t[n]), nf.map(n => y[n]), { ls: 'none', marker: 'x', color: 'black', label: 'Neighbour Forecasts' });
+    ax.plot([r.t[ti]], [y[ti]], { ls: 'none', marker: '^', color: P8, label: 'Current Time' });
+    ax.plot([r.t[ti + fcs]], [forecast[i]], { ls: 'none', marker: 'x', color: P8, label: 'Average Forecast' });
+    nb.forEach((n, j) => ax.plot(r.t.subarray(n, nf[j]), y.subarray(n, nf[j]), { color: 'black', lw: 2, ls: '--' }));
+    ax.plot(r.t.subarray(ti, ti + fcs), y.subarray(ti, ti + fcs), { color: P8, lw: 2 });
+    ax.axvspan(0, r.t[split], { color: 'grey', alpha: 0.15 });
+    const ys = nf.map(n => y[n]);
+    ax.axhspan(Math.min(...ys), Math.max(...ys), { color: P8, alpha: 0.2 });
+    ax.set({ xlim: [XMIN, XMAX], ylabel: LABELS[i], xticklabels: i === 2 });
+  });
+  axs[2].set({ xlabel: 'Time' });
+  axs[0].plot([r.t[ti], r.t[ti + fcs]], [forecast[0] - 3, forecast[0] - 3], { color: 'black', noscale: false });
+  axs[0].text(r.t[ti], forecast[0] - 8, '$t_{fc}$', { size: 10 });
+  axs[0].legend({ ncol: 2, loc: 'lower left', fontsize: 8, frameon: false, labelspacing: 0.3, borderpad: 0, handletextpad: 0.2, columnspacing: 0.3 });
+  $('fig2').innerHTML = fig.toSVG();
+  F2.axes = axs;
+}
+function hookFig2Drag() {
+  const host = $('fig2'); let drag = false;
+  const toT = (e) => {
+    const rc = host.getBoundingClientRect(); const px = (e.clientX - rc.left) / rc.width * 1505;
+    const ax = F2.axes[0]; const t = ax.xl[0] + (px - ax.x0) / (ax.x1 - ax.x0) * (ax.xl[1] - ax.xl[0]);
+    const dt = F2.dt; const hi = 12 - ST.fig2.tfc - dt;
+    ST.fig2.t = Math.max(10, Math.min(hi, Math.round(t / dt) * dt + dt / 4));
+  };
+  host.addEventListener('pointerdown', (e) => { drag = true; host.setPointerCapture(e.pointerId); toT(e); requestAnimationFrame(drawFig2); e.preventDefault(); });
+  host.addEventListener('pointermove', (e) => { if (drag) { toT(e); requestAnimationFrame(drawFig2); } });
+  host.addEventListener('pointerup', () => { drag = false; });
+  host.style.cursor = 'ew-resize';
+}
+
+/* ================= Figure 3: forecast vs actual ================= */
+let F3 = null;
+function computeFig3base() {
+  const N = 2000, r = integrateLorenz(G, X0, 0, 20, N);
+  const [tr, te] = partitionData(r.y, 0.5, N);
+  F3 = { N, r, tr, te, dt: 20 / N, cache: null };
+}
+function drawFig3() {
+  const { N, tr, te, dt } = F3, K = ST.fig3.k, FC = ST.fig3.fc;
+  if (!F3.cache || F3.cache.kmax < K + FC) F3.cache = neighbourCache(tr, te, Math.max(K + FC, 120));
+  const fc = forecastFromCache(F3.cache, tr, K, FC);
+  const corr = calculateCorrelation(fc, te, FC);
+  const split = Math.trunc(N * 0.5), END = 20;
+  const t = linspace(END - split * dt, END, 1 + N - split);
+  const fig = new Fig(1729, 1249);
+  const axs = [[156, 66, 1684, 356], [156, 443, 1684, 734], [156, 821, 1684, 1111]].map(b => fig.addAxes(...b));
+  axs.forEach((ax, i) => {
+    ax.plot(t.subarray(FC), te[i].subarray(FC), { color: 'grey', label: 'Actual' });
+    ax.plot(t.subarray(FC), fc[i].subarray(0, fc[i].length - FC), { color: Purples(0.95), alpha: 0.7, label: 'Forecast' });
+    ax.set({ ylabel: LABELS[i], xlim: [END - split * dt, END], xticklabels: i === 2 });
+    ax.text(0, 1.06, `Correlation ${LABELS[i]}: ${corr[i].toFixed(4)}`, { transform: 'axes', ha: 'left', va: 'center', size: 10, weight: 'bold' });
+  });
+  axs[0].legend({ loc: 'lower right', frameon: false, handlelength: 0.7, borderpad: 0 });
+  axs[2].set({ xlabel: 'Time' });
+  $('fig3').innerHTML = fig.toSVG();
+}
+
+/* ================= Figure 4: metric entropy ================= */
+function runFig4() {
+  progress('fig4', 0.01);
+  runJob('fig4', Object.assign({}, G, { k: ST.fig4.k }), (m) => {
+    RES.fig4 = m.data; RES.fig4.final = m.type === 'done';
+    progress('fig4', m.type === 'done' ? 1 : m.data.frac); drawFig4();
+  });
+}
+function runEns() {
+  progress('fig4i', 0.01); progress('figa1', 0.01);
+  runJob('ens', Object.assign({}, G), (m) => {
+    RES.ens = m.data; progress('fig4i', m.data.frac); progress('figa1', m.data.frac); drawFig4(); drawFigA1();
+  });
+}
+function drawFig4() {
+  const fig = new Fig(1634, 1331);
+  const ax = fig.addAxes(163, 30, 1606, 1190);
+  const R = RES.fig4, colors = [Purples(0.9), Purples(0.7), Purples(0.5)];
+  if (R) {
+    const ex = R.y.map(r => r.map(Math.exp));
+    for (let d = 0; d < 3; d++) ax.plot(R.x, ex.map(r => r[d]), { color: colors[d], label: `Dimension ${LABELS[d]}`, alpha: 1 });
+    if (R.final) {
+      const PL = 60; let maxx = 0, minx = 100;
+      for (let d = 0; d < 3; d++) {
+        const xi = R.x.slice(0, PL).filter((_, i) => R.masks[d][i]);
+        const xs = xi.slice(0, Math.max(0, xi.length - 3));
+        ax.plot(xs, xs.map(v => Math.exp(R.slopes[d] * v + R.intercepts[d])), { ls: '-', color: 'black', alpha: 0.8, lw: 2 });
+        if (xi.length) { maxx = Math.max(xi[xi.length - 1], maxx); minx = Math.min(xi[0], minx); }
+      }
+      ax.plot([0], [0], { color: 'black', label: 'Linear Fit' });
+      ax.axvspan(minx, maxx, { color: Purples(0.8), alpha: 0.1 });
+      ['x', 'y', 'z'].forEach((l, d) => ax.text(minx + 0.03, Math.exp(-2 - 0.5 * d), `$h_${l}$ = ${(R.slopes[d] / 2 * R.dt).toFixed(2)} $s^{-1}$`, { size: 10, ha: 'left', va: 'center' }));
+    }
+  }
+  ax.legend({ loc: 'lower right', frameon: false });
+  ax.set({ xlabel: '$t_\\text{fc}$', ylabel: '1-r', ylog: true });
+  if (!R) ax.set({ xlim: [-0.0405, 1.0505], ylim: [3e-4, 0.25] });
+  // inset
+  const ai = fig.addAxes(1161, 466, 1576, 804);
+  const E = RES.ens;
+  if (E) for (let d = 0; d < 3; d++) ai.plot(E.steps.map(s => s / 400), E.c.map(c => c[d]), { color: CYCLE[d], label: d === 0 ? 'Ensemble Entropy' : undefined });
+  ai.set({ xlabel: 'Sampling Rate / Unit', ylabel: 'Entropy (First 4 Points)' });
+  if (!E) ai.set({ xlim: [-3.7, 105], ylim: [-0.0125, 0.0425] });
+  $('fig4').innerHTML = fig.toSVG();
+}
+function drawFigA1() {
+  const fig = new Fig(1725, 741);
+  const a0 = fig.addAxes(181, 30, 841, 602), a1 = fig.addAxes(1025, 30, 1685, 602);
+  const E = RES.ens, cols = [Purples(0.8), Purples(0.6), Purples(0.4)].map((c, i) => c);
+  const lab = ['$h_x$', '$h_y$', '$h_z$'];
+  if (E) for (let d = 0; d < 3; d++) {
+    a0.plot(E.steps, E.c.map(c => c[d]), { color: cols[d], label: lab[d] });
+    a1.plot(E.steps, E.h.map(c => c[d]), { color: cols[d], label: lab[d] });
+  }
+  a1.legend({ loc: 'upper left', fontsize: 10, frameon: true });
+  a0.set({ ylabel: 'Entropy (per timestep)', xlabel: 'Number of Steps' });
+  a1.set({ ylabel: 'Entropy (per time unit)', xlabel: 'Number of Steps' });
+  if (E) { a0._limits(); a1.set({ xlim: a0.xl }); }
+  else { a0.set({ xlim: [-1475, 41975], ylim: [-0.0125, 0.0425] }); a1.set({ xlim: [-1475, 41975], ylim: [-0.8, 2.85] }); }
+  $('figa1').innerHTML = fig.toSVG();
+}
+
+/* ================= Figure 5: metric entropy vs noise ================= */
+function runFig5() {
+  progress('fig5', 0.01);
+  runJob('fig5', Object.assign({}, G, { k: ST.fig5.k }), (m) => { RES.fig5 = m.data; progress('fig5', m.data.frac); drawFig5(); });
+}
+function drawFig5() {
+  const fig = new Fig(1635, 588);
+  const axs = [[164, 83, 610, 450], [662, 83, 1108, 450], [1160, 83, 1606, 450]].map(b => fig.addAxes(...b));
+  const R = RES.fig5, colors = [Purples(0.9), Purples(0.7), Purples(0.5)];
+  axs[0].set({ ylabel: 'Metric Entropy' });
+  axs[2].plot([0], [0], { color: Purples(0.8), label: 'Metric Entropy', noscale: true });
+  if (R) {
+    if (R.fits) R.fits.forEach(([m, c], i) => axs[i].plot(R.nf, R.nf.map(a => R.dt * Math.exp(m * a + c)), { color: 'black', alpha: 0.5, ls: '--', label: 'Exponential Fit' }));
+    axs.forEach((ax, i) => ax.plot(R.nf, R.h.map(h => R.dt * h[i]), { color: colors[i] }));
+  }
+  axs.forEach((ax, i) => ax.set({ xlabel: 'Noise Fraction', title: `Dimension ${LABELS[i]}`, yticklabels: i === 0 }));
+  axs[2].legend({ frameon: false, loc: 'upper right' });
+  // sharey
+  let lo = Infinity, hi = -Infinity; axs.forEach(a => { a._limits(); lo = Math.min(lo, a.yl[0]); hi = Math.max(hi, a.yl[1]); });
+  if (!R) { lo = -0.0015; hi = 0.0325; }
+  axs.forEach(a => a.set({ ylim: [lo, hi], xlim: [-0.05, 1.05] }));
+  $('fig5').innerHTML = fig.toSVG();
+}
+
+/* ================= Figure 6: sensitivity + Lyapunov spectrum ================= */
+let F6 = null;
+function computeFig6left() {
+  const N = 2000;
+  const sol = integrateLorenz(G, X0, 0, 20, N, N);
+  const rnd = makeNormal(1000 + ST.fig6.seed);
+  const pert = [0, 1, 2].map(() => rnd() * 1e-3);
+  const pr = integrateLorenz(G, X0.map((v, i) => v + pert[i]), 0, 20, N, N);
+  F6 = { sol, pr };
+}
+function runLyap() { progress('fig6', 0.01); runJob('lyap', Object.assign({}, G), (m) => { RES.lyap = m.data; progress('fig6', 1); drawFig6(); }); }
+function drawFig6() {
+  const fig = new Fig(1789, 881);
+  const L = [[156, 86, 893, 269], [156, 323, 893, 506], [156, 560, 893, 743]].map(b => fig.addAxes(...b));
+  const { sol, pr } = F6, cols = [Purples(0.9), Purples(0.7), Purples(0.5)];
+  L.forEach((ax, i) => {
+    ax.plot(sol.t, sol.y[i], { color: 'grey', label: LABELS[i], ls: '--' });
+    ax.plot(pr.t, pr.y[i], { color: cols[i], label: 'Perturbed ' + LABELS[i] });
+    ax.axvspan(0, 8, { color: 'grey', alpha: 0.2 });
+    ax.set({ xlim: [0, 20], ylabel: LABELS[i], xticklabels: i === 2 });
+  });
+  L[0].legend({ frameon: false, loc: 'upper center', fontsize: 8, bbox: [0.5, 1.4], ncol: 2 });
+  L[2].set({ xlabel: 'Time' });
+  const ax4 = fig.addAxes(1023, 86, 1760, 743);
+  ax4.set({ title: 'Lyapunov Spectrum', xlabel: 'Time' });
+  const R = RES.lyap;
+  if (R) {
+    const n = R.over[0].length, time = linspace(0, n * 0.01, n);
+    for (let i = 0; i < 3; i++) ax4.plot(time, R.over[i], { color: CYCLE[i], label: `$\\lambda_${i + 1}$ = ${R.exps[i].toFixed(3)}` });
+    ax4._limits(); ax4.set({ ylim: [ax4.yl[0], 7] });
+  } else ax4.set({ xlim: [-0.5, 10.5], ylim: [-16.2, 7] });
+  ax4.legend({ frameon: false, loc: 'upper right', fontsize: 8, labelspacing: 0.2 });
+  $('fig6').innerHTML = fig.toSVG();
+}
+
+/* ================= Figure 7: optimal embedding parameters ================= */
+function runFig7() {
+  progress('fig7', 0.01);
+  runJob('fig7', Object.assign({}, G, { a: ST.fig7.a }), (m) => {
+    RES.fig7 = m.data; progress('fig7', m.data.frac); drawFig7();
+    if (m.type === 'done' && !ST.fig8.touched) {
+      const t = m.data.smi.ind, tn = m.data.smiN.ind;
+      if (t !== ST.fig8.tau || tn !== ST.fig8.tauN) { ST.fig8.tau = t; ST.fig8.tauN = tn; CTL.tau && CTL.tau.refresh(); runFig8(); }
+    }
+  });
+}
+function drawFig7() {
+  const fig = new Fig(1638, 1180);
+  const box = [[122, 82, 780, 452], [952, 82, 1610, 452], [122, 664, 780, 1034], [952, 664, 1610, 1034]];
+  const axs = box.map(b => fig.addAxes(...b));
+  const R = RES.fig7 || {};
+  const aStr = (v) => String(+v.toFixed(4));
+  const titles = ['a=0', 'a=0', 'a=' + aStr(ST.fig7.a), 'a=' + aStr(ST.fig7.a)];
+  const smiPanel = (ax, S) => {
+    if (S) {
+      ax.plot(range(0, S.smi.length), S.smi, { color: CYCLE[0] });
+      if (S.ind >= 0) {
+        ax.axvline(S.ind, { color: 'black', ls: '--', label: `Optimal Delay $\\tau^* = ${S.ind}$` });
+        ax.plot([S.ind], [S.smi[S.ind]], { ls: 'none', marker: 'o', color: 'black' });
+      }
+    }
+    ax.set({ xlabel: 'Embedding Delay $\\tau$', ylabel: 'Self Mutual Information' });
+    if (!S || S.smi.length < 100) ax.set({ xlim: [-4.95, 103.95] });
+    if (!S) ax.set({ ylim: [-0.4, 8.35] });
+    ax.legend({ frameon: false, loc: 'upper right' });
+  };
+  const caoPanel = (ax, C) => {
+    if (C) {
+      ax.plot(range(0, C.E1.length), C.E1, { color: CYCLE[0], label: 'Ratio E1' });
+      ax.plot(range(0, C.E2.length), C.E2, { color: Purples(0.5), label: 'Ratio E2' });
+      ax.hlines(1, 0, C.E1.length, { color: 'black', ls: '--', lw: 0.8, label: '$E_\\text{i} = 1$' });
+    } else ax.set({ xlim: [-0.45, 9.45], ylim: [-0.06, 1.25] });
+    ax.set({ xlabel: 'Embedding Dimension $\\tilde{m}$', ylabel: 'E1 & E2' });
+    ax.legend({ frameon: false, loc: 'lower right' });
+  };
+  smiPanel(axs[0], R.smi); caoPanel(axs[1], R.cao); smiPanel(axs[2], R.smiN); caoPanel(axs[3], R.caoN);
+  axs.forEach((a, i) => a.set({ title: titles[i] }));
+  $('fig7').innerHTML = fig.toSVG();
+}
+
+/* ================= Figure 8: entropy of the embedding ================= */
+function runFig8() {
+  progress('fig8', 0.01);
+  const S = ST.fig8;
+  runJob('fig8', Object.assign({}, G, { tau: S.tau, tauN: S.tauN, m: S.m, k: S.k, a: ST.fig7.a }), (m) => { RES.fig8 = m.data; RES.fig8.m = S.m; progress('fig8', m.data.frac); drawFig8(); });
+}
+function drawFig8() {
+  const R = RES.fig8 || {}, m = R.m || ST.fig8.m;
+  const top = 83, bot = 1638, gap = 50, hh = (bot - top - gap * (m - 1)) / m;
+  const fig = new Fig(1782, 1779);
+  const rows = range(0, m).map(i => [top + i * (hh + gap), top + i * (hh + gap) + hh]);
+  const axs = rows.map(([y0, y1]) => [fig.addAxes(163, y0, 934, y1), fig.addAxes(983, y0, 1753, y1)]);
+  const aStr = String(+ST.fig7.a.toFixed(4));
+  const dt = R.dt || 0.01;
+  const panel = (ax, D, d, col, lab, dummy) => {
+    if (dummy) ax.plot([0], [0], { label: 'a=0', alpha: 0.8, color: Purples(0.9), noscale: true });
+    if (D) {
+      ax.plot(D.x, D.y.map(r => Math.exp(r[d])), { label: lab, alpha: 0.8, color: col });
+      const xi = D.x.slice(0, 50).filter((_, i) => D.masks[d][i]);
+      ax.plot(xi, xi.map(v => Math.exp(D.slopes[d] * v + D.intercepts[d])), { color: 'black', alpha: 0.8, lw: 2, ls: '--', label: 'Linear Fit' });
+      ax.text(0.05, 0.9, `$h_{${d}}$ = ${sval(dt * D.slopes[d] / 2, 2)}`, { size: 10, ha: 'left', va: 'top', transform: 'axes' });
+    }
+  };
+  for (let d = 0; d < m; d++) {
+    panel(axs[d][0], R.clean, d, Purples(0.9), 'a=0', false);
+    panel(axs[d][1], R.noisy, d, Purples(0.5), 'a=' + aStr, true);
+    axs[d][0].set({ ylabel: `1-r (Dimension ${d})`, ylog: true, xticklabels: d === m - 1 });
+    axs[d][1].set({ ylog: true, xticklabels: d === m - 1, yticklabels: false });
+  }
+  axs[0][0].set({ title: 'a=0 (No Noise)' }); axs[0][1].set({ title: ` a=${aStr} (Noise)` });
+  axs[m - 1].forEach(a => a.set({ xlabel: '$t_\\text{fc}$' }));
+  axs[m - 1][1].legend({ loc: 'lower right', frameon: false });
+  // sharex / sharey
+  const flat = axs.flat(); let ylo = Infinity, yhi = -Infinity, xlo = Infinity, xhi = -Infinity;
+  flat.forEach(a => { a._limits(); ylo = Math.min(ylo, a.yl[0]); yhi = Math.max(yhi, a.yl[1]); xlo = Math.min(xlo, a.xl[0]); xhi = Math.max(xhi, a.xl[1]); });
+  if (!R.clean) { ylo = 2.5e-3; yhi = 0.6; xlo = -0.04; xhi = 1.05; }
+  flat.forEach(a => a.set({ ylim: [ylo, yhi], xlim: [xlo, xhi] }));
+  $('fig8').innerHTML = fig.toSVG();
+}
+
+/* ================= wiring ================= */
+const CTL = {};
+function recomputeAllHeavy() { runFig4(); runEns(); runFig5(); runLyap(); runFig7(); runFig8(); }
+function onGlobalInput() {
+  computeFig1(); drawFig1();
+  computeFig2base(); drawFig2();
+  computeFig3base(); drawFig3();
+  computeFig6left(); drawFig6();
+}
+function buildControls() {
+  const c1 = $('fig1-c');
+  const heavy = () => later('heavy', recomputeAllHeavy, 300);
+  const g = (k) => () => G[k], s = (k) => (v) => { G[k] = v; };
+  slider(c1, 'σ', 1, 20, 0.1, g('sigma'), s('sigma'), () => later('g', onGlobalInput, 30), heavy, 1);
+  slider(c1, 'ρ', 10, 50, 0.1, g('rho'), s('rho'), () => later('g', onGlobalInput, 30), heavy, 1);
+  slider(c1, 'β', 0.5, 5, 0.01, g('beta'), s('beta'), () => later('g', onGlobalInput, 30), heavy, 2);
+
+  const c2 = $('fig2-c');
+  slider(c2, 'k', 1, 30, 1, () => ST.fig2.k, v => ST.fig2.k = v, () => requestAnimationFrame(drawFig2), null, 0);
+  slider(c2, 't<sub>fc</sub>', 0.02, 1.5, 0.02, () => ST.fig2.tfc, v => { ST.fig2.tfc = v; ST.fig2.t = Math.min(ST.fig2.t, 12 - v - 0.02); }, () => requestAnimationFrame(drawFig2), null, 2);
+
+  const c3 = $('fig3-c');
+  slider(c3, 'k', 1, 100, 1, () => ST.fig3.k, v => ST.fig3.k = v, () => later('f3', drawFig3, 10), null, 0);
+  slider(c3, 't<sub>fc</sub>', 0.01, 0.5, 0.01, () => ST.fig3.fc * 0.01, v => ST.fig3.fc = Math.round(v / 0.01), () => later('f3', drawFig3, 10), null, 2);
+
+  slider($('fig4-c'), 'k', 10, 1000, 10, () => ST.fig4.k, v => ST.fig4.k = v, null, () => later('f4', runFig4), 0);
+  slider($('fig5-c'), 'k', 10, 500, 10, () => ST.fig5.k, v => ST.fig5.k = v, null, () => later('f5', runFig5), 0);
+
+  slider($('fig7-c'), 'a', 0, 0.5, 0.01, () => ST.fig7.a, v => ST.fig7.a = v, () => { drawFig7(); drawFig8(); }, () => later('f7', () => { runFig7(); runFig8(); }), 2);
+
+  const c8 = $('fig8-c');
+  CTL.tau = slider(c8, 'τ', 1, 60, 1, () => ST.fig8.tau, v => { ST.fig8.tau = v; ST.fig8.touched = true; }, null, () => later('f8', runFig8), 0);
+  slider(c8, 'm̃', 1, 8, 1, () => ST.fig8.m, v => ST.fig8.m = v, null, () => later('f8', runFig8), 0);
+}
+async function main() {
+  try {
+    await Promise.race([Promise.all([
+      document.fonts.load("16px 'Source Sans 3'"), document.fonts.load("italic 16px 'Source Sans 3'"), document.fonts.load("bold 16px 'Source Sans 3'")]),
+      new Promise(r => setTimeout(r, 2500))]);
+  } catch (e) { /* offline: fall back */ }
+  buildControls();
+  onGlobalInput();
+  drawFig4(); drawFig5(); drawFig7(); drawFig8(); drawFigA1();
+  hookRotate(); hookFig2Drag();
+  $('fig6').addEventListener('click', (e) => {
+    const rc = $('fig6').getBoundingClientRect(); if ((e.clientX - rc.left) / rc.width > 0.53) return;
+    ST.fig6.seed++; computeFig6left(); drawFig6();
+  });
+  recomputeAllHeavy();
+}
+main();
+
+</script>
+</body>
+</html>
