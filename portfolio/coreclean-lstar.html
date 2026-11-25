@@ -88,13 +88,21 @@
     <p>This is the <b>corrected</b> record. The version in the original report was built from section images that had been
       stitched rotated, so each section&rsquo;s record ran upside down, and sections were joined in string order (1, 10, 11, &hellip;, 2, 20, &hellip;).
       Both errors only reordered rows, so the record has been rebuilt exactly from the original measurements.</p>
-    <p>Image depth is cumulative photographed length, with sections in splice order. It tracks, but is not tied to, the
-      revised composite depth (rmcd) of the spectrophotometer splice, so the two records can drift apart by tens of
-      centimetres in places. Image colour values come from an uncalibrated camera, so compare their shapes with the
-      spectrophotometer record, not their absolute values.</p>
+    <p>All three records are on the revised composite depth scale (rmcd) of the Hodell et&nbsp;al. (2015) splice. Each
+      photographed section starts where the splice table puts it. Its exact position is then fitted by correlating its
+      filtered L* against the spectrophotometer record, keeping sections in core order within their splice interval with
+      no overlaps. Most sections move by only a few centimetres (median 5&nbsp;cm). The largest moves, up to 0.65&nbsp;m,
+      are in intervals where the photographs are shorter than the curated core. Blank stretches are places with no
+      usable photograph.</p>
+    <p>Section U1385A-10H-2 (87.3&ndash;88.8&nbsp;m) is left out of the image records. The sediment there is a
+      little darker (about 4&nbsp;L* in the spectrophotometer record), but the photograph is about 13&nbsp;L* darker
+      again, relative to the spectrophotometer, than any other section. That points to an exposure problem with the
+      photograph, not real sediment colour.</p>
+    <p>Image colour values come from an uncalibrated camera, so compare their shapes with the spectrophotometer
+      record, not their absolute values.</p>
     <h2>Data</h2>
     <ul>
-      <li><a href="../assets/coreclean-lstar/coreclean_lstar_1mm.csv.gz">Image records, 1&nbsp;mm bins (CSV, gzip, 2.8&nbsp;MB)</a>: depth,
+      <li><a href="../assets/coreclean-lstar/coreclean_lstar_1mm.csv.gz">Image records, 1&nbsp;mm bins (CSV, gzip)</a>: depth (rmcd),
         unfiltered and filtered L*, SD, a*, b*, and percent of pixels kept.</li>
       <li>Spectrophotometer splice: Hodell, D.A. et&nbsp;al. (2015), <i>Color reflectance of IODP Site 339-U1385</i>, PANGAEA,
         <a href="https://doi.org/10.1594/PANGAEA.872081">doi:10.1594/PANGAEA.872081</a> (CC-BY 3.0). This is the supplement to
@@ -234,12 +242,18 @@ function reduce(p, toPx) {
   }
   return { direct: false, cols: [...cols.entries()].sort((a, b) => a[0] - b[0]) };
 }
-function extent(r) {
-  let lo = Infinity, hi = -Infinity;
-  const x0 = view.x0, x1 = view.x1;
-  if (r.direct) { const p = r.p; for (let i = 0; i < p.xs.length; i++) { const v = p.vs[i]; if (p.xs[i] >= x0 && p.xs[i] <= x1 && v === v) { if (v < lo) lo = v; if (v > hi) hi = v; } } }
-  else for (const [, b] of r.cols) if (b.cnt) { if (b.min < lo) lo = b.min; if (b.max > hi) hi = b.max; }
-  return [lo, hi];
+// visible values of a reduced series, for the y range
+function visibleValues(r) {
+  const out = [];
+  if (r.direct) { const p = r.p; for (let i = 0; i < p.xs.length; i++) { const v = p.vs[i]; if (p.xs[i] >= view.x0 && p.xs[i] <= view.x1 && v === v) out.push(v); } }
+  else for (const [, b] of r.cols) if (b.cnt) out.push(b.min, b.max);
+  return out;
+}
+// 1-99 percentile range, so the one-pixel spikes at section ends don't flatten everything else
+function robustRange(vals) {
+  if (!vals.length) return [Infinity, -Infinity];
+  const a = Float64Array.from(vals).sort(), q = f => a[Math.min(a.length - 1, Math.max(0, Math.round(f * (a.length - 1))))];
+  return a.length < 50 ? [a[0], a[a.length - 1]] : [q(0.01), q(0.99)];
 }
 function strokeSeries(r, color, yPx, band) {
   ctx.save();
@@ -315,14 +329,10 @@ function draw() {
     red[s] = p && p.xs.length ? reduce(p, x => xToPx(x)) : null;
   }
   // y domains: the two image records share one; the spectrophotometer has its own
-  const dom = {};
-  const group = s => (s === 's' ? 's' : 'img');
-  for (const { s } of panels) {
-    if (!red[s]) continue;
-    const [lo, hi] = extent(red[s]); const g = group(s);
-    if (!dom[g]) dom[g] = [Infinity, -Infinity];
-    dom[g][0] = Math.min(dom[g][0], lo); dom[g][1] = Math.max(dom[g][1], hi);
-  }
+  const dom = {}, vals = {};
+  const group = s => s;  // each panel scales to its own record
+  for (const { s } of panels) if (red[s]) (vals[group(s)] = vals[group(s)] || []).push(...visibleValues(red[s]));
+  for (const g in vals) dom[g] = robustRange(vals[g]);
   for (const g in dom) {
     let [lo, hi] = dom[g];
     if (!isFinite(lo)) { lo = 0; hi = 1; }
@@ -331,6 +341,7 @@ function draw() {
   }
 
   const secVisible = opt.sec && span < 40 ? sections.filter(sc => sc.top_m > view.x0 && sc.top_m < view.x1) : [];
+  const excl = sections.filter(sc => sc.excluded && sc.end_m > view.x0 && sc.top_m < view.x1);
 
   panels.forEach(({ s, y0, y1 }, idx) => {
     // title
@@ -375,6 +386,15 @@ function draw() {
 
     // data
     ctx.save(); ctx.beginPath(); ctx.rect(L, y0, pw, y1 - y0); ctx.clip();
+    if (s !== 's') for (const sc of excl) {
+      const a = xToPx(sc.top_m), b = xToPx(sc.end_m);
+      ctx.fillStyle = 'rgba(0,0,0,0.045)'; ctx.fillRect(a, y0, b - a, y1 - y0);
+      if (b - a > 70) {
+        ctx.fillStyle = '#777'; ctx.font = `11px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(b - a > 190 ? sc.label + ' excluded (exposure)' : 'excluded', (Math.max(a, L) + Math.min(b, L + pw)) / 2, (y0 + y1) / 2);
+        ctx.font = `12px ${FONT}`;
+      }
+    }
     if (red[s] && d) strokeSeries(red[s], COLOR[s], yPx, opt.sd && opt.ch === 'L' && s !== 's');
     else {
       ctx.fillStyle = '#777'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -409,7 +429,7 @@ function draw() {
   const dec = decimals(step);
   ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = `12px ${FONT}`;
   for (const t of ticks) ctx.fillText(t.toFixed(dec), xToPx(t), yb + 6);
-  ctx.font = `13px ${FONT}`; ctx.fillText('Depth (m)', L + pw / 2, yb + 21);
+  ctx.font = `13px ${FONT}`; ctx.fillText('Depth (m rmcd)', L + pw / 2, yb + 21);
 
   // crosshair
   if (hoverX !== null) {
@@ -468,14 +488,13 @@ function keptAt(x) {
   return NaN;
 }
 function sectionAt(x) {
-  let lo = 0, hi = sections.length - 1;
-  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (sections[m].top_m <= x) lo = m; else hi = m - 1; }
-  return sections[lo];
+  return sections.find(sc => x >= sc.top_m && x < sc.end_m) || null;
 }
 function showTip(px, py) {
   if (hoverX === null) { tip.style.display = 'none'; return; }
   const sc = sectionAt(hoverX);
-  let html = `<div class="h">${hoverX.toFixed(view.x1 - view.x0 < 2 ? 3 : 2)} m <span class="m">&middot; ${sc ? sc.label : ''}</span></div>`;
+  const scTxt = sc ? sc.label + (sc.excluded ? ' (excluded)' : '') : 'no image';
+  let html = `<div class="h">${hoverX.toFixed(view.x1 - view.x0 < 2 ? 3 : 2)} m rmcd <span class="m">&middot; ${scTxt}</span></div>`;
   for (const { s } of layout.panels) {
     const hv = valueAt(s, hoverX);
     const sw = `<span class="sw" style="background:${COLOR[s]}"></span>`;
@@ -488,7 +507,7 @@ function showTip(px, py) {
     if (s === 'f') { const k = keptAt(hoverX); if (k === k) line += ` <span class="m">(${Math.round(k)}% kept)</span>`; }
     if (s === 's') {
       const j = nearest(spec.depth, hv.x);
-      line += ` <span class="m">&middot; ${spec.depth[j].toFixed(2)} rmcd &middot; ${Math.round(spec.ageLR04[j])} ka</span>`;
+      line += ` <span class="m">&middot; ${Math.round(spec.ageLR04[j])} ka</span>`;
     }
     html += `<div class="r">${sw}${line}</div>`;
   }
