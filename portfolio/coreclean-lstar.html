@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoreClean Colour Record</title>
+<meta name="description" content="Interactive viewer for the corrected CoreClean downcore colour record of IODP Site U1385, beside the shipboard spectrophotometer splice.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: #fff; color: #000; font-family: 'Source Sans 3', 'Source Sans Pro', sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 20px 16px 48px; }
+  a { color: #6a51a3; }
+  .back { margin: 0 0 6px; font-size: 15px; }
+  h1 { font-size: 28px; margin: 0 0 6px; }
+  .lede { margin: 0 0 16px; font-size: 16px; line-height: 1.45; max-width: 760px; }
+  .ctls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 0 0 10px; font-size: 15px; }
+  .ctls label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+  .ctls input[type=checkbox] { accent-color: #6a51a3; margin: 0; }
+  .sw { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
+  .seg { display: inline-flex; border: 1px solid #bbb; border-radius: 4px; overflow: hidden; }
+  .seg button { font: inherit; font-style: italic; border: 0; background: #fff; padding: 2px 11px; cursor: pointer; color: #000; }
+  .seg button + button { border-left: 1px solid #bbb; }
+  .seg button[aria-pressed=true] { background: #6a51a3; color: #fff; }
+  .range { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+  .range input { font: inherit; width: 5.2em; padding: 1px 4px; border: 1px solid #bbb; border-radius: 4px; }
+  .range button { font: inherit; padding: 1px 10px; border: 1px solid #bbb; border-radius: 4px; background: #fff; cursor: pointer; }
+  .range button:hover, .seg button:hover:not([aria-pressed=true]) { background: #f3f1f8; }
+  .plotwrap { position: relative; }
+  #plot { display: block; width: 100%; touch-action: pan-y; cursor: grab; outline: none; }
+  #plot.dragging { cursor: grabbing; }
+  #plot:focus-visible { box-shadow: 0 0 0 2px #6a51a3; }
+  #nav { display: block; width: 100%; height: 52px; margin-top: 4px; touch-action: pan-y; cursor: pointer; }
+  .tip { position: absolute; pointer-events: none; background: rgba(255,255,255,.96); border: 1px solid #ccc; border-radius: 4px;
+         padding: 6px 9px; font-size: 13px; line-height: 1.45; box-shadow: 0 2px 8px rgba(0,0,0,.08); display: none; white-space: nowrap; }
+  .tip .h { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tip .r { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+  .tip .m { color: #666; }
+  .status { position: absolute; right: 14px; top: 2px; font-size: 13px; color: #666; }
+  .hint { font-size: 13px; color: #666; margin: 6px 0 0; }
+  .notes { margin-top: 26px; font-size: 15px; line-height: 1.5; max-width: 760px; }
+  .notes h2 { font-size: 18px; margin: 22px 0 6px; }
+  .notes p { margin: 0 0 10px; }
+  .notes ul { margin: 0 0 10px; padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <p class="back"><a href="coreclean.html">&larr; coreclean</a></p>
+  <h1>Downcore colour at the Shackleton Site</h1>
+  <p class="lede">Sediment lightness down 166&nbsp;m of core from IODP Site U1385 on the Iberian Margin (about 1.4 million years).
+    It was measured from core photographs before and after CoreClean masked out cracks, burrows and drilling disturbance,
+    and is shown above the shipboard spectrophotometer record. Scroll or pinch to zoom, drag to pan, and hover for values.</p>
+
+  <div class="ctls">
+    <div class="seg" role="group" aria-label="Colour channel">
+      <button data-ch="L" aria-pressed="true">L*</button><button data-ch="a" aria-pressed="false">a*</button><button data-ch="b" aria-pressed="false">b*</button>
+    </div>
+    <label><input type="checkbox" id="show-u" checked><span class="sw" style="background:#d97a1c"></span>Unfiltered</label>
+    <label><input type="checkbox" id="show-f" checked><span class="sw" style="background:#6a51a3"></span>Filtered</label>
+    <label><input type="checkbox" id="show-s" checked><span class="sw" style="background:#222"></span>Spectrophotometer</label>
+    <label><input type="checkbox" id="opt-sd" checked>&plusmn;1 SD</label>
+    <label><input type="checkbox" id="opt-sec" checked>Section breaks</label>
+    <span class="range"><input id="r0" type="number" step="0.1" min="0" aria-label="Top depth (m)"> &ndash;
+      <input id="r1" type="number" step="0.1" min="0" aria-label="Bottom depth (m)"> m
+      <button id="reset" type="button">Full record</button></span>
+  </div>
+
+  <div class="plotwrap" id="wrap">
+    <canvas id="plot" tabindex="0" aria-label="Downcore colour records. Arrow keys pan, plus and minus zoom, 0 resets."></canvas>
+    <div class="tip" id="tip"></div>
+    <div class="status" id="status">Loading&hellip;</div>
+  </div>
+  <canvas id="nav" aria-label="Whole-record navigator: click or drag to move the window"></canvas>
+  <p class="hint">At 12&nbsp;m or less the image records switch from 1&nbsp;cm to 1&nbsp;mm bins. The view is saved in the URL, so you can share a link to it.</p>
+
+  <div class="notes">
+    <h2>What&rsquo;s shown</h2>
+    <ul>
+      <li><b>Unfiltered image record:</b> mean colour across the width of each core photograph at every depth, with the
+        within-row standard deviation, from the stitched, background-removed composite.</li>
+      <li><b>Filtered image record:</b> the same, using only pixels the SegNet model classed as undisturbed sediment. Depths
+        where more than half the row was masked are left blank. The hover readout gives the fraction of pixels kept.</li>
+      <li><b>Spectrophotometer record:</b> the shipboard L* splice at 1&nbsp;cm from Hodell et&nbsp;al. (2015), with its LR04 age
+        model shown in the readout.</li>
+    </ul>
+    <p>This is the <b>corrected</b> record. The version in the original report was built from section images that had been
+      stitched rotated, so each section&rsquo;s record ran upside down, and sections were joined in string order (1, 10, 11, &hellip;, 2, 20, &hellip;).
+      Both errors only reordered rows, so the record has been rebuilt exactly from the original measurements.</p>
+    <p>Image depth is cumulative photographed length, with sections in splice order. It tracks, but is not tied to, the
+      revised composite depth (rmcd) of the spectrophotometer splice, so the two records can drift apart by tens of
+      centimetres in places. Image colour values come from an uncalibrated camera, so compare their shapes with the
+      spectrophotometer record, not their absolute values.</p>
+    <h2>Data</h2>
+    <ul>
+      <li><a href="../assets/coreclean-lstar/coreclean_lstar_1mm.csv.gz">Image records, 1&nbsp;mm bins (CSV, gzip, 2.8&nbsp;MB)</a>: depth,
+        unfiltered and filtered L*, SD, a*, b*, and percent of pixels kept.</li>
+      <li>Spectrophotometer splice: Hodell, D.A. et&nbsp;al. (2015), <i>Color reflectance of IODP Site 339-U1385</i>, PANGAEA,
+        <a href="https://doi.org/10.1594/PANGAEA.872081">doi:10.1594/PANGAEA.872081</a> (CC-BY 3.0). This is the supplement to
+        <a href="https://doi.org/10.1016/j.gloplacha.2015.07.002">Hodell et&nbsp;al. (2015), Global and Planetary Change 133, 49&ndash;64</a>.</li>
+      <li>Code: <a href="https://github.com/Sam0fc/coreclean">github.com/Sam0fc/coreclean</a> &middot; <a href="../assets/coreclean.pdf">full report</a>.</li>
+    </ul>
+  </div>
+</main>
+
+<script>
+'use strict';
+const BASE = '../assets/coreclean-lstar/';
+const COLOR = { u: '#d97a1c', f: '#6a51a3', s: '#222222' };
+const TITLE = { u: 'Unfiltered Image Record', f: 'Filtered Image Record', s: 'Spectrophotometer Record' };
+const SHORT = { u: 'Unfiltered', f: 'Filtered', s: 'Spectro' };
+const DETAIL_SPAN = 12, MIN_SPAN = 0.05;
+const FONT = '"Source Sans 3", "Source Sans Pro", sans-serif';
+
+const plot = document.getElementById('plot'), nav = document.getElementById('nav');
+const tip = document.getElementById('tip'), statusEl = document.getElementById('status');
+const ctx = plot.getContext('2d'), nctx = nav.getContext('2d');
+const r0 = document.getElementById('r0'), r1 = document.getElementById('r1');
+
+let meta, LEN = 1, overview, spec, sections = [];
+const detail = new Map(), pending = new Set();
+const view = { x0: 0, x1: 1 };
+const opt = { ch: 'L', show: { u: true, f: true, s: true }, sd: true, sec: true };
+let layout = null, hoverX = null, lastPts = {};
+
+/* ---------- data ---------- */
+function decode(buf, n) {
+  const raw = new Int16Array(buf), cols = {};
+  meta.columns.forEach((name, c) => {
+    const a = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const v = raw[c * n + i]; a[i] = v === meta.missing ? NaN : v / meta.scale; }
+    cols[name] = a;
+  });
+  return cols;
+}
+const getBuf = f => fetch(BASE + f).then(r => { if (!r.ok) throw new Error(f + ' ' + r.status); return r.arrayBuffer(); });
+
+function levelsFor(x0, x1) {
+  if (x1 - x0 > DETAIL_SPAN) return [overview];
+  const cm = meta.detail.chunk_m, chunks = meta.detail.chunks;
+  const k0 = Math.max(0, Math.floor(x0 / cm)), k1 = Math.min(chunks.length - 1, Math.floor(x1 / cm));
+  const out = [];
+  let missing = false;
+  for (let k = k0; k <= k1; k++) {
+    if (detail.has(k)) { out.push(detail.get(k)); continue; }
+    missing = true;
+    if (!pending.has(k)) {
+      pending.add(k); setStatus();
+      getBuf(chunks[k].file).then(b => {
+        detail.set(k, { start: chunks[k].start_m, bin: meta.detail.bin_m, n: chunks[k].n, cols: decode(b, chunks[k].n) });
+      }).catch(err => console.warn(err)).finally(() => { pending.delete(k); setStatus(); draw(); });
+    }
+  }
+  return missing ? [overview] : out;
+}
+function setStatus() { statusEl.textContent = pending.size ? 'Loading detail…' : ''; }
+
+const keyFor = (s, ch) => s + (ch === 'L' ? 'L' : ch);
+
+// visible points of one series: {x, v, sd} arrays; NaN in v marks a gap
+function collect(s, x0, x1) {
+  const xs = [], vs = [], sds = [];
+  if (s === 's') {
+    if (opt.ch !== 'L') return null;
+    const d = spec.depth;
+    let lo = 0, hi = d.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (d[m] < x0) lo = m + 1; else hi = m; }
+    for (let i = Math.max(0, lo - 1); i < d.length; i++) {
+      if (i > 0 && d[i] - d[i - 1] > 0.05) { xs.push((d[i] + d[i - 1]) / 2); vs.push(NaN); sds.push(NaN); }
+      xs.push(d[i]); vs.push(spec.L[i]); sds.push(NaN);
+      if (d[i] > x1) break;
+    }
+    return { xs, vs, sds, ages: null };
+  }
+  const vk = keyFor(s, opt.ch), sk = opt.ch === 'L' ? s + 'sd' : null;
+  for (const lv of levelsFor(x0, x1)) {
+    const v = lv.cols[vk], sd = sk && lv.cols[sk];
+    const i0 = Math.max(0, Math.floor((x0 - lv.start) / lv.bin) - 1);
+    const i1 = Math.min(lv.n - 1, Math.ceil((x1 - lv.start) / lv.bin) + 1);
+    for (let i = i0; i <= i1; i++) { xs.push(lv.start + (i + 0.5) * lv.bin); vs.push(v[i]); sds.push(sd ? sd[i] : NaN); }
+  }
+  return { xs, vs, sds };
+}
+
+/* ---------- geometry ---------- */
+function niceTicks(a, b, n) {
+  const span = b - a, raw = span / Math.max(1, n), mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || 10 * mag;
+  const out = [];
+  for (let t = Math.ceil(a / step - 1e-9) * step; t <= b + 1e-9; t += step) out.push(+t.toFixed(10));
+  return { ticks: out, step };
+}
+const decimals = step => Math.max(0, -Math.floor(Math.log10(step) + 1e-9));
+
+function computeLayout() {
+  const W = plot.clientWidth;
+  const panels = ['u', 'f', 's'].filter(s => opt.show[s]);
+  const ph = Math.round(Math.max(110, Math.min(170, W * 0.19)));
+  const L = 54, R = 12, top = 24, gap = 30, bottom = 38;
+  const H = panels.length ? top + panels.length * ph + (panels.length - 1) * gap + bottom : 80;
+  return { W, H, L, R, top, gap, ph, bottom, pw: W - L - R, panels: panels.map((s, i) => ({ s, y0: top + i * (ph + gap), y1: top + i * (ph + gap) + ph })) };
+}
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  layout = computeLayout();
+  plot.style.height = layout.H + 'px';
+  plot.width = Math.round(layout.W * dpr); plot.height = Math.round(layout.H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const nw = nav.clientWidth;
+  nav.width = Math.round(nw * dpr); nav.height = Math.round(52 * dpr);
+  nctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+const xToPx = x => layout.L + (x - view.x0) / (view.x1 - view.x0) * layout.pw;
+const pxToX = px => view.x0 + (px - layout.L) / layout.pw * (view.x1 - view.x0);
+
+/* ---------- rendering ---------- */
+// reduce points to at most ~2 per pixel column (min/max per column) so 16k points draw crisply
+function reduce(p, toPx) {
+  const n = p.xs.length, W = layout.pw;
+  if (n <= 2.5 * W) return { direct: true, p };
+  const cols = new Map();
+  for (let i = 0; i < n; i++) {
+    const v = p.vs[i]; const c = Math.floor(toPx(p.xs[i]));
+    let b = cols.get(c);
+    if (!b) { b = { first: NaN, last: NaN, min: Infinity, max: -Infinity, lo: 0, hi: 0, nb: 0, cnt: 0 }; cols.set(c, b); }
+    if (!(v === v)) continue;
+    if (!(b.first === b.first)) b.first = v;
+    b.last = v; b.cnt++;
+    if (v < b.min) b.min = v; if (v > b.max) b.max = v;
+    const sd = p.sds[i];
+    if (sd === sd) { b.lo += v - sd; b.hi += v + sd; b.nb++; }
+  }
+  return { direct: false, cols: [...cols.entries()].sort((a, b) => a[0] - b[0]) };
+}
+function extent(r) {
+  let lo = Infinity, hi = -Infinity;
+  const x0 = view.x0, x1 = view.x1;
+  if (r.direct) { const p = r.p; for (let i = 0; i < p.xs.length; i++) { const v = p.vs[i]; if (p.xs[i] >= x0 && p.xs[i] <= x1 && v === v) { if (v < lo) lo = v; if (v > hi) hi = v; } } }
+  else for (const [, b] of r.cols) if (b.cnt) { if (b.min < lo) lo = b.min; if (b.max > hi) hi = b.max; }
+  return [lo, hi];
+}
+function strokeSeries(r, color, yPx, band) {
+  ctx.save();
+  if (band) {
+    ctx.fillStyle = color; ctx.globalAlpha = 0.18;
+    const runs = []; let run = [];
+    if (r.direct) {
+      const p = r.p;
+      for (let i = 0; i < p.xs.length; i++) {
+        const v = p.vs[i], sd = p.sds[i];
+        if (v === v && sd === sd) run.push([xToPx(p.xs[i]), yPx(v - sd), yPx(v + sd)]); else if (run.length) { runs.push(run); run = []; }
+      }
+    } else {
+      let prev = null;
+      for (const [c, b] of r.cols) {
+        if (b.nb && (prev === null || c - prev <= 1)) run.push([c + 0.5, yPx(b.lo / b.nb), yPx(b.hi / b.nb)]);
+        else { if (run.length) runs.push(run); run = b.nb ? [[c + 0.5, yPx(b.lo / b.nb), yPx(b.hi / b.nb)]] : []; }
+        prev = c;
+      }
+    }
+    if (run.length) runs.push(run);
+    for (const rr of runs) {
+      if (rr.length < 2) continue;
+      ctx.beginPath(); ctx.moveTo(rr[0][0], rr[0][1]);
+      for (const q of rr) ctx.lineTo(q[0], q[1]);
+      for (let i = rr.length - 1; i >= 0; i--) ctx.lineTo(rr[i][0], rr[i][2]);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.strokeStyle = color; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  if (r.direct) {
+    ctx.lineWidth = 1.5;
+    const p = r.p; let pen = false;
+    for (let i = 0; i < p.xs.length; i++) {
+      const v = p.vs[i];
+      if (v === v) { const X = xToPx(p.xs[i]), Y = yPx(v); if (pen) ctx.lineTo(X, Y); else { ctx.moveTo(X, Y); pen = true; } }
+      else pen = false;
+    }
+  } else {
+    ctx.lineWidth = 1;
+    let prev = null;
+    for (const [c, b] of r.cols) {
+      if (!b.cnt) { prev = null; continue; }
+      const X = c + 0.5;
+      if (prev === null || c - prev > 1) ctx.moveTo(X, yPx(b.first)); else ctx.lineTo(X, yPx(b.first));
+      ctx.lineTo(X, yPx(b.min)); ctx.lineTo(X, yPx(b.max)); ctx.lineTo(X, yPx(b.last));
+      prev = c;
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function draw() {
+  if (!meta || !layout) return;
+  const { W, H, L, pw, panels } = layout;
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = `12px ${FONT}`;
+  if (!panels.length) {
+    ctx.fillStyle = '#666'; ctx.textAlign = 'center'; ctx.fillText('Tick a record above to show it.', W / 2, 40);
+    drawNav(); syncInputs(); return;
+  }
+  const span = view.x1 - view.x0;
+  const { ticks, step } = niceTicks(view.x0, view.x1, Math.max(3, Math.floor(pw / 90)));
+
+  // gather & reduce
+  const red = {}; lastPts = {};
+  for (const { s } of panels) {
+    const p = collect(s, view.x0, view.x1);
+    lastPts[s] = p;
+    red[s] = p && p.xs.length ? reduce(p, x => xToPx(x)) : null;
+  }
+  // y domains: the two image records share one; the spectrophotometer has its own
+  const dom = {};
+  const group = s => (s === 's' ? 's' : 'img');
+  for (const { s } of panels) {
+    if (!red[s]) continue;
+    const [lo, hi] = extent(red[s]); const g = group(s);
+    if (!dom[g]) dom[g] = [Infinity, -Infinity];
+    dom[g][0] = Math.min(dom[g][0], lo); dom[g][1] = Math.max(dom[g][1], hi);
+  }
+  for (const g in dom) {
+    let [lo, hi] = dom[g];
+    if (!isFinite(lo)) { lo = 0; hi = 1; }
+    if (hi - lo < 0.5) { const m = (lo + hi) / 2; lo = m - 0.25; hi = m + 0.25; }
+    const pad = (hi - lo) * 0.08; dom[g] = [lo - pad, hi + pad];
+  }
+
+  const secVisible = opt.sec && span < 40 ? sections.filter(sc => sc.top_m > view.x0 && sc.top_m < view.x1) : [];
+
+  panels.forEach(({ s, y0, y1 }, idx) => {
+    // title
+    ctx.fillStyle = '#000'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.font = `bold 14px ${FONT}`; ctx.fillText(TITLE[s], L, y0 - 5);
+    ctx.font = `12px ${FONT}`;
+
+    const d = dom[group(s)];
+    const yPx = d ? (v => y1 - (v - d[0]) / (d[1] - d[0]) * (y1 - y0)) : null;
+
+    // grid + y ticks
+    if (d) {
+      const yt = niceTicks(d[0], d[1], Math.max(2, Math.floor((y1 - y0) / 34)));
+      const dec = decimals(yt.step);
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      for (const t of yt.ticks) {
+        const Y = Math.round(yPx(t)) + 0.5;
+        ctx.strokeStyle = '#eeeeee'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L, Y); ctx.lineTo(L + pw, Y); ctx.stroke();
+        ctx.strokeStyle = '#000'; ctx.beginPath(); ctx.moveTo(L - 4, Y); ctx.lineTo(L, Y); ctx.stroke();
+        ctx.fillStyle = '#000'; ctx.fillText(t.toFixed(dec), L - 7, Y);
+      }
+    }
+    for (const t of ticks) {
+      const X = Math.round(xToPx(t)) + 0.5;
+      ctx.strokeStyle = '#eeeeee'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X, y0); ctx.lineTo(X, y1); ctx.stroke();
+    }
+    // section breaks
+    if (secVisible.length) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.setLineDash([3, 3]);
+      for (const sc of secVisible) { const X = Math.round(xToPx(sc.top_m)) + 0.5; ctx.beginPath(); ctx.moveTo(X, y0); ctx.lineTo(X, y1); ctx.stroke(); }
+      ctx.setLineDash([]);
+      if (idx === 0 && span < 10) {
+        ctx.fillStyle = '#777'; ctx.font = `11px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        let lastEnd = -Infinity;
+        for (const sc of secVisible) {
+          const X = xToPx(sc.top_m) + 3, w = ctx.measureText(sc.label).width;
+          if (X > lastEnd + 4 && X + w < L + pw) { ctx.fillText(sc.label, X, y0 + 3); lastEnd = X + w; }
+        }
+        ctx.font = `12px ${FONT}`;
+      }
+    }
+
+    // data
+    ctx.save(); ctx.beginPath(); ctx.rect(L, y0, pw, y1 - y0); ctx.clip();
+    if (red[s] && d) strokeSeries(red[s], COLOR[s], yPx, opt.sd && opt.ch === 'L' && s !== 's');
+    else {
+      ctx.fillStyle = '#777'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(s === 's' && opt.ch !== 'L' ? 'The spectrophotometer splice has L* only' : 'No data in this range', L + pw / 2, (y0 + y1) / 2);
+    }
+    // hover marker
+    if (hoverX !== null && red[s] && d) {
+      const hv = valueAt(s, hoverX);
+      if (hv && hv.v === hv.v) {
+        const X = xToPx(hv.x), Y = yPx(hv.v);
+        ctx.fillStyle = COLOR[s]; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(X, Y, 4, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.restore();
+
+    // axes box (left + bottom like matplotlib's default spines, light top/right)
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(L + 0.5, y0); ctx.lineTo(L + 0.5, y1 + 0.5); ctx.lineTo(L + pw, y1 + 0.5); ctx.stroke();
+    ctx.strokeStyle = '#ccc'; ctx.beginPath(); ctx.moveTo(L, y0 + 0.5); ctx.lineTo(L + pw - 0.5, y0 + 0.5); ctx.lineTo(L + pw - 0.5, y1); ctx.stroke();
+    // x ticks marks on every panel
+    ctx.strokeStyle = '#000';
+    for (const t of ticks) { const X = Math.round(xToPx(t)) + 0.5; ctx.beginPath(); ctx.moveTo(X, y1); ctx.lineTo(X, y1 + 4); ctx.stroke(); }
+    // y label
+    ctx.save(); ctx.translate(14, (y0 + y1) / 2); ctx.rotate(-Math.PI / 2);
+    ctx.font = `italic 14px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000';
+    ctx.fillText(opt.ch + '*', 0, 0); ctx.restore();
+  });
+
+  // x tick labels + axis label under the last panel
+  const yb = panels[panels.length - 1].y1;
+  const dec = decimals(step);
+  ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = `12px ${FONT}`;
+  for (const t of ticks) ctx.fillText(t.toFixed(dec), xToPx(t), yb + 6);
+  ctx.font = `13px ${FONT}`; ctx.fillText('Depth (m)', L + pw / 2, yb + 21);
+
+  // crosshair
+  if (hoverX !== null) {
+    const X = Math.round(xToPx(hoverX)) + 0.5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 1;
+    for (const { y0, y1 } of panels) { ctx.beginPath(); ctx.moveTo(X, y0); ctx.lineTo(X, y1); ctx.stroke(); }
+  }
+  drawNav();
+  syncInputs();
+}
+
+function drawNav() {
+  const W = nav.clientWidth, H = 52, L = layout.L, R = layout.R, pw = W - L - R, top = 4, bh = 30;
+  nctx.clearRect(0, 0, W, H);
+  const key = opt.show.f ? keyFor('f', opt.ch) : keyFor('u', opt.ch);
+  const v = overview.cols[key];
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < v.length; i++) if (v[i] === v[i]) { if (v[i] < lo) lo = v[i]; if (v[i] > hi) hi = v[i]; }
+  const X = x => L + x / LEN * pw, Y = val => top + bh - (val - lo) / (hi - lo || 1) * bh;
+  const mins = new Float32Array(Math.ceil(pw) + 1).fill(Infinity), maxs = new Float32Array(Math.ceil(pw) + 1).fill(-Infinity);
+  for (let i = 0; i < v.length; i++) {
+    if (!(v[i] === v[i])) continue;
+    const c = Math.floor((i + 0.5) * overview.bin / LEN * pw);
+    if (v[i] < mins[c]) mins[c] = v[i]; if (v[i] > maxs[c]) maxs[c] = v[i];
+  }
+  nctx.strokeStyle = '#9e9ac8'; nctx.lineWidth = 1; nctx.beginPath();
+  for (let c = 0; c < mins.length; c++) if (mins[c] < Infinity) { nctx.moveTo(L + c + 0.5, Y(maxs[c])); nctx.lineTo(L + c + 0.5, Y(mins[c]) + 0.5); }
+  nctx.stroke();
+  // window
+  const a = X(view.x0), b = Math.max(X(view.x1), X(view.x0) + 2);
+  nctx.fillStyle = 'rgba(255,255,255,0.65)';
+  nctx.fillRect(L, top, a - L, bh); nctx.fillRect(b, top, L + pw - b, bh);
+  nctx.strokeStyle = '#6a51a3'; nctx.lineWidth = 1.5; nctx.strokeRect(a, top + 0.5, b - a, bh - 1);
+  nctx.strokeStyle = '#000'; nctx.lineWidth = 1; nctx.beginPath(); nctx.moveTo(L, top + bh + 0.5); nctx.lineTo(L + pw, top + bh + 0.5); nctx.stroke();
+  nctx.fillStyle = '#555'; nctx.font = `11px ${FONT}`; nctx.textAlign = 'center'; nctx.textBaseline = 'top';
+  for (let t = 0; t <= LEN; t += 20) nctx.fillText(t + (t === 0 ? ' m' : ''), X(t), top + bh + 3);
+}
+
+/* ---------- hover ---------- */
+function nearest(xs, x) {
+  let lo = 0, hi = xs.length - 1;
+  if (hi < 0) return -1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] < x) lo = m; else hi = m; }
+  return Math.abs(xs[lo] - x) <= Math.abs(xs[hi] - x) ? lo : hi;
+}
+function valueAt(s, x) {
+  const p = lastPts[s]; if (!p || !p.xs.length) return null;
+  const i = nearest(p.xs, x); if (i < 0) return null;
+  return { x: p.xs[i], v: p.vs[i], sd: p.sds[i], i };
+}
+function keptAt(x) {
+  for (const lv of levelsFor(view.x0, view.x1)) {
+    const i = Math.floor((x - lv.start) / lv.bin);
+    if (i >= 0 && i < lv.n) return lv.cols.kept[i];
+  }
+  return NaN;
+}
+function sectionAt(x) {
+  let lo = 0, hi = sections.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (sections[m].top_m <= x) lo = m; else hi = m - 1; }
+  return sections[lo];
+}
+function showTip(px, py) {
+  if (hoverX === null) { tip.style.display = 'none'; return; }
+  const sc = sectionAt(hoverX);
+  let html = `<div class="h">${hoverX.toFixed(view.x1 - view.x0 < 2 ? 3 : 2)} m <span class="m">&middot; ${sc ? sc.label : ''}</span></div>`;
+  for (const { s } of layout.panels) {
+    const hv = valueAt(s, hoverX);
+    const sw = `<span class="sw" style="background:${COLOR[s]}"></span>`;
+    if (!hv || !(hv.v === hv.v)) {
+      if (s !== 's' || opt.ch === 'L') html += `<div class="r">${sw}${SHORT[s]} <span class="m">no data</span></div>`;
+      continue;
+    }
+    let line = `${SHORT[s]} ${opt.ch}* ${hv.v.toFixed(2)}`;
+    if (hv.sd === hv.sd) line += ` &plusmn; ${hv.sd.toFixed(2)}`;
+    if (s === 'f') { const k = keptAt(hoverX); if (k === k) line += ` <span class="m">(${Math.round(k)}% kept)</span>`; }
+    if (s === 's') {
+      const j = nearest(spec.depth, hv.x);
+      line += ` <span class="m">&middot; ${spec.depth[j].toFixed(2)} rmcd &middot; ${Math.round(spec.ageLR04[j])} ka</span>`;
+    }
+    html += `<div class="r">${sw}${line}</div>`;
+  }
+  tip.innerHTML = html;
+  tip.style.display = 'block';
+  const ww = plot.clientWidth, tw = tip.offsetWidth, th = tip.offsetHeight;
+  let left = px + 16; if (left + tw > ww - 4) left = px - tw - 16; if (left < 0) left = 4;
+  let topPos = Math.min(Math.max(0, py - th / 2), layout.H - th);
+  tip.style.left = left + 'px'; tip.style.top = topPos + 'px';
+}
+
+/* ---------- view control ---------- */
+function setView(x0, x1) {
+  let span = Math.min(LEN, Math.max(MIN_SPAN, x1 - x0));
+  let mid = (x0 + x1) / 2;
+  x0 = mid - span / 2; x1 = mid + span / 2;
+  if (x0 < 0) { x1 -= x0; x0 = 0; }
+  if (x1 > LEN) { x0 -= x1 - LEN; x1 = LEN; }
+  view.x0 = Math.max(0, x0); view.x1 = Math.min(LEN, x1);
+  scheduleDraw(); saveHash();
+}
+function zoomAt(x, f) { setView(x - (x - view.x0) * f, x + (view.x1 - x) * f); }
+let raf = 0;
+function scheduleDraw() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; draw(); if (lastPointer) showTip(lastPointer.x, lastPointer.y); }); }
+let hashTimer = 0;
+function saveHash() {
+  clearTimeout(hashTimer);
+  hashTimer = setTimeout(() => {
+    const full = view.x0 <= 1e-6 && view.x1 >= LEN - 1e-6;
+    history.replaceState(null, '', full ? location.pathname + location.search : `#${view.x0.toFixed(2)}-${view.x1.toFixed(2)}`);
+  }, 250);
+}
+function syncInputs() {
+  if (document.activeElement !== r0) r0.value = view.x0.toFixed(2);
+  if (document.activeElement !== r1) r1.value = view.x1.toFixed(2);
+}
+
+let lastPointer = null;
+const pointers = new Map();
+let drag = null;
+function localPos(e) { const r = plot.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+function inPlot(p) { return layout && p.x >= layout.L && p.x <= layout.L + layout.pw; }
+
+plot.addEventListener('pointerdown', e => {
+  plot.setPointerCapture(e.pointerId);
+  const p = localPos(e); pointers.set(e.pointerId, p);
+  if (pointers.size === 1) drag = { x: p.x, x0: view.x0, x1: view.x1 };
+  else if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    drag = { pinch: true, d: Math.abs(a.x - b.x) || 1, mid: pxToX((a.x + b.x) / 2), x0: view.x0, x1: view.x1 };
+  }
+  plot.classList.add('dragging');
+});
+plot.addEventListener('pointermove', e => {
+  const p = localPos(e);
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
+  if (drag && drag.pinch && pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.abs(a.x - b.x) || 1, f = drag.d / d, m = drag.mid;
+    // keep the depth that started under the fingers' midpoint under their current midpoint
+    const span = (drag.x1 - drag.x0) * f, mNow = ((a.x + b.x) / 2 - layout.L) / layout.pw;
+    const nx0 = m - mNow * span; setView(nx0, nx0 + span);
+  } else if (drag && pointers.size === 1) {
+    const dx = (p.x - drag.x) / layout.pw * (drag.x1 - drag.x0);
+    setView(drag.x0 - dx, drag.x1 - dx);
+  }
+  if (e.pointerType === 'mouse' || !drag) {
+    lastPointer = p;
+    hoverX = inPlot(p) ? Math.min(view.x1, Math.max(view.x0, pxToX(p.x))) : null;
+    scheduleDraw();
+  }
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size === 0) { drag = null; plot.classList.remove('dragging'); }
+  else if (pointers.size === 1) { const [q] = [...pointers.values()]; drag = { x: q.x, x0: view.x0, x1: view.x1 }; }
+}
+plot.addEventListener('pointerup', endPointer);
+plot.addEventListener('pointercancel', endPointer);
+plot.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { hoverX = null; lastPointer = null; tip.style.display = 'none'; scheduleDraw(); } });
+plot.addEventListener('wheel', e => {
+  const p = localPos(e); if (!inPlot(p)) return;
+  e.preventDefault();
+  const k = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1;
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+    const dx = e.deltaX * k / layout.pw * (view.x1 - view.x0); setView(view.x0 + dx, view.x1 + dx);
+  } else zoomAt(pxToX(p.x), Math.exp(e.deltaY * k * 0.0018));
+}, { passive: false });
+plot.addEventListener('dblclick', () => setView(0, LEN));
+plot.addEventListener('keydown', e => {
+  const span = view.x1 - view.x0, mid = (view.x0 + view.x1) / 2;
+  if (e.key === 'ArrowLeft') setView(view.x0 - span * 0.2, view.x1 - span * 0.2);
+  else if (e.key === 'ArrowRight') setView(view.x0 + span * 0.2, view.x1 + span * 0.2);
+  else if (e.key === '+' || e.key === '=') zoomAt(mid, 0.7);
+  else if (e.key === '-' || e.key === '_') zoomAt(mid, 1 / 0.7);
+  else if (e.key === '0') setView(0, LEN);
+  else return;
+  e.preventDefault();
+});
+
+// navigator
+let navDrag = null;
+function navX(e) { const r = nav.getBoundingClientRect(); return (e.clientX - r.left - layout.L) / (r.width - layout.L - layout.R) * LEN; }
+nav.addEventListener('pointerdown', e => {
+  nav.setPointerCapture(e.pointerId);
+  const x = navX(e), span = view.x1 - view.x0;
+  if (x < view.x0 || x > view.x1) setView(x - span / 2, x + span / 2);
+  navDrag = { x, x0: view.x0, x1: view.x1 };
+});
+nav.addEventListener('pointermove', e => { if (!navDrag) return; const dx = navX(e) - navDrag.x; setView(navDrag.x0 + dx, navDrag.x1 + dx); });
+nav.addEventListener('pointerup', () => { navDrag = null; });
+nav.addEventListener('pointercancel', () => { navDrag = null; });
+
+// controls
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  opt.ch = b.dataset.ch;
+  document.querySelectorAll('.seg button').forEach(o => o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
+  draw();
+}));
+for (const s of ['u', 'f', 's']) document.getElementById('show-' + s).addEventListener('change', e => { opt.show[s] = e.target.checked; resize(); });
+document.getElementById('opt-sd').addEventListener('change', e => { opt.sd = e.target.checked; draw(); });
+document.getElementById('opt-sec').addEventListener('change', e => { opt.sec = e.target.checked; draw(); });
+document.getElementById('reset').addEventListener('click', () => setView(0, LEN));
+function fromInputs() {
+  const a = parseFloat(r0.value), b = parseFloat(r1.value);
+  if (isFinite(a) && isFinite(b) && b > a) setView(a, b); else syncInputs();
+}
+r0.addEventListener('change', fromInputs); r1.addEventListener('change', fromInputs);
+[r0, r1].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') { el.blur(); fromInputs(); } }));
+
+/* ---------- boot ---------- */
+(async function boot() {
+  try {
+    meta = await fetch(BASE + 'meta.json').then(r => r.json());
+    LEN = meta.length_m; sections = meta.sections;
+    const [ob, sb] = await Promise.all([getBuf(meta.overview.file), getBuf(meta.spectro.file)]);
+    overview = { start: 0, bin: meta.overview.bin_m, n: meta.overview.n, cols: decode(ob, meta.overview.n) };
+    const f = new Float32Array(sb), n = meta.spectro.n;
+    spec = { depth: f.subarray(0, n), L: f.subarray(n, 2 * n), ageLR04: f.subarray(2 * n, 3 * n) };
+    const m = location.hash.match(/^#([\d.]+)-([\d.]+)$/);
+    view.x0 = 0; view.x1 = LEN;
+    if (m) { const a = +m[1], b = +m[2]; if (b > a) { view.x0 = a; view.x1 = b; } }
+    statusEl.textContent = '';
+    resize();
+    setView(view.x0, view.x1);
+    let lastW = plot.clientWidth;
+    new ResizeObserver(() => { if (plot.clientWidth !== lastW) { lastW = plot.clientWidth; resize(); } }).observe(document.getElementById('wrap'));
+    if (document.fonts) document.fonts.ready.then(draw);
+  } catch (err) {
+    statusEl.textContent = 'Could not load the data (' + err.message + ').';
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
